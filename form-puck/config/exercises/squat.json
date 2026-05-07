@@ -1,0 +1,70 @@
+{
+    "name": "Squat",
+    "landmarks": {
+        "left_shoulder": 11,
+        "right_shoulder": 12,
+        "left_hip": 23,
+        "right_hip": 24,
+        "left_knee": 25,
+        "right_knee": 26,
+        "left_ankle": 27,
+        "right_ankle": 28,
+        "left_foot_index": 31,
+        "right_foot_index": 32
+    },
+    "angles": {
+        "knee": {
+            "points": ["left_hip", "left_knee", "left_ankle"],
+            "points_secondary": ["right_hip", "right_knee", "right_ankle"],
+            "ideal_min": 70,
+            "ideal_max": 100,
+            "fault_min": 110
+        },
+        "hip": {
+            "points": ["left_shoulder", "left_hip", "left_knee"],
+            "points_secondary": ["right_shoulder", "right_hip", "right_knee"],
+            "ideal_min": 45,
+            "ideal_max": 90
+        },
+        "back": {
+            "points": ["left_shoulder", "left_hip"],
+            "vertical_threshold": 45
+        }
+    },
+    "rep_detection": {
+        "state_machine": "descending_ascending",
+        "bottom_hold_frames": 9,
+        "hip_knee_ratio_threshold": 0.95,
+        "standing_stability_frames": 5
+    },
+    "scoring": {
+        "base_score": 100,
+        "faults": {
+            "back_rounding": {
+                "deduction": 20,
+                "threshold_deg": 45,
+                "description": "Back rounding - excessive forward lean"
+            },
+            "insufficient_depth": {
+                "deduction": 15,
+                "threshold_deg": 110,
+                "description": "Insufficient depth - go deeper"
+            },
+            "knee_cave": {
+                "deduction": 15,
+                "threshold_deg": 15,
+                "description": "Knee cave detected - push knees out"
+            },
+            "asymmetric_descent": {
+                "deduction": 10,
+                "threshold_deg": 10,
+                "description": "Asymmetric descent - even out both sides"
+            },
+            "bounce_at_bottom": {
+                "deduction": 10,
+                "velocity_threshold": 0.05,
+                "description": "Bouncing at bottom - control the movement"
+            }
+        }
+    }
+}

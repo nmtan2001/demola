@@ -1,0 +1,59 @@
+{
+    "name": "Deadlift",
+    "landmarks": {
+        "left_shoulder": 11,
+        "right_shoulder": 12,
+        "left_hip": 23,
+        "right_hip": 24,
+        "left_knee": 25,
+        "right_knee": 26,
+        "left_ankle": 27,
+        "right_ankle": 28,
+        "left_wrist": 15,
+        "right_wrist": 16
+    },
+    "angles": {
+        "knee": {
+            "points": ["left_hip", "left_knee", "left_ankle"],
+            "points_secondary": ["right_hip", "right_knee", "right_ankle"],
+            "ideal_min": 140,
+            "ideal_max": 180
+        },
+        "hip": {
+            "points": ["left_shoulder", "left_hip", "left_knee"],
+            "points_secondary": ["right_shoulder", "right_hip", "right_knee"],
+            "ideal_min": 60,
+            "ideal_max": 120
+        },
+        "back": {
+            "points": ["left_shoulder", "left_hip"],
+            "vertical_threshold": 30
+        }
+    },
+    "rep_detection": {
+        "state_machine": "descending_ascending",
+        "bottom_hold_frames": 6,
+        "hip_knee_ratio_threshold": 1.0,
+        "standing_stability_frames": 5
+    },
+    "scoring": {
+        "base_score": 100,
+        "faults": {
+            "back_rounding": {
+                "deduction": 25,
+                "threshold_deg": 30,
+                "description": "Back rounding - keep spine neutral"
+            },
+            "bar_path_deviation": {
+                "deduction": 15,
+                "threshold_deg": 15,
+                "description": "Bar drifting from legs"
+            },
+            "hip_shoot": {
+                "deduction": 20,
+                "threshold_deg": 10,
+                "description": "Hips rising before chest"
+            }
+        }
+    }
+}

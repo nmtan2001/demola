@@ -1,0 +1,11 @@
+{
+    "camera_index": 0,
+    "frame_width": 640,
+    "frame_height": 480,
+    "target_fps": 30,
+    "default_exercise": "squat",
+    "model_dir": "models",
+    "mediapipe_model_complexity": 1,
+    "min_detection_confidence": 0.5,
+    "min_tracking_confidence": 0.5
+}

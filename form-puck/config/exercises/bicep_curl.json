@@ -1,0 +1,50 @@
+{
+    "name": "Bicep Curl",
+    "landmarks": {
+        "left_shoulder": 11,
+        "right_shoulder": 12,
+        "left_elbow": 13,
+        "right_elbow": 14,
+        "left_wrist": 15,
+        "right_wrist": 16,
+        "left_hip": 23,
+        "right_hip": 24
+    },
+    "angles": {
+        "elbow": {
+            "points": ["left_shoulder", "left_elbow", "left_wrist"],
+            "points_secondary": ["right_shoulder", "right_elbow", "right_wrist"],
+            "ideal_min": 30,
+            "ideal_max": 55
+        },
+        "shoulder": {
+            "points": ["left_hip", "left_shoulder", "left_elbow"],
+            "points_secondary": ["right_hip", "right_shoulder", "right_elbow"],
+            "ideal_min": 0,
+            "ideal_max": 30
+        }
+    },
+    "rep_detection": {
+        "state_machine": "contracting_extending",
+        "extended_threshold": 150,
+        "contracted_threshold": 55,
+        "transition_buffer": 10,
+        "hold_frames": 3,
+        "standing_stability_frames": 5
+    },
+    "scoring": {
+        "base_score": 100,
+        "faults": {
+            "elbow_swing": {
+                "deduction": 20,
+                "threshold_deg": 40,
+                "description": "Elbow swinging - keep elbow tucked"
+            },
+            "insufficient_contraction": {
+                "deduction": 15,
+                "threshold_deg": 55,
+                "description": "Not curling all the way up"
+            }
+        }
+    }
+}

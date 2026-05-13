@@ -10,13 +10,14 @@ class FormScorer:
         self._faults_config = self._scoring_config["faults"]
         self._calc = AngleCalculator()
         self._smoother = EMASmoother(alpha=0.35)
+        self._active_faults = set()
 
     def evaluate(self, landmarks, world_landmarks, rep_state, hip_velocity):
         """Evaluate form for current frame.
 
         Args:
-            landmarks: Nx4 array from MediaPipe
-            world_landmarks: Nx3 array or None
+            landmarks: Nx4 array from MediaPipe (x, y, z, visibility)
+            world_landmarks: Nx3 array or None (x, y, z in meters)
             rep_state: current RepState
             hip_velocity: list of recent hip velocities
         Returns:
@@ -25,6 +26,7 @@ class FormScorer:
         if landmarks is None:
             return {"score": 0, "faults": [], "angles": {}, "is_good": True}
 
+        self._world_landmarks = world_landmarks
         angles_config = self._angles_config
 
         # Calculate all relevant angles
@@ -52,14 +54,15 @@ class FormScorer:
             )
             metrics["hip_angle"] = self._smoother.smooth("hip_angle", (hip_angle + hip_angle_sec) / 2.0)
 
-        # Back angle (forward lean from vertical)
+        # Back angle (forward lean from vertical) - use 3D world landmarks
         back_cfg = self._get_back_config()
-        if back_cfg:
+        if back_cfg and world_landmarks is not None:
             shoulder_idx = self._landmark_map.get("left_shoulder", 11)
             hip_idx = self._landmark_map.get("left_hip", 23)
-            shoulder = self._calc.get_landmark_xy(landmarks, shoulder_idx)
-            hip = self._calc.get_landmark_xy(landmarks, hip_idx)
-            metrics["back_angle"] = self._smoother.smooth("back_angle", self._calc.calculate_vertical_angle(shoulder, hip))
+            shoulder = self._calc.get_landmark_xyz(world_landmarks, shoulder_idx)
+            hip = self._calc.get_landmark_xyz(world_landmarks, hip_idx)
+            if shoulder is not None and hip is not None:
+                metrics["back_angle"] = self._smoother.smooth("back_angle", self._calc.calculate_vertical_angle(shoulder, hip))
 
         # Elbow angle (for curl exercises)
         elbow_pts = self._get_angle_points(landmarks, "elbow")
@@ -81,10 +84,11 @@ class FormScorer:
             )
             metrics["shoulder_angle"] = self._smoother.smooth("shoulder_angle", (shoulder_angle + shoulder_angle_sec) / 2.0)
 
-        # Knee tracking (cave detection)
-        knee_cave = self._calculate_knee_cave(landmarks)
-        if knee_cave is not None:
-            metrics["knee_cave"] = self._smoother.smooth("knee_cave", knee_cave)
+        # Knee tracking (cave detection) - use 3D world landmarks
+        if world_landmarks is not None:
+            knee_cave = self._calculate_knee_cave_3d(world_landmarks)
+            if knee_cave is not None:
+                metrics["knee_cave"] = self._smoother.smooth("knee_cave", knee_cave)
 
         # Asymmetry
         if "knee_angle_left" in metrics and "knee_angle_right" in metrics:
@@ -97,8 +101,10 @@ class FormScorer:
         active_faults = []
 
         for fault_name, fault_cfg in self._faults_config.items():
-            detected, value = self._check_fault(fault_name, fault_cfg, metrics, hip_velocity)
+            currently_active = fault_name in self._active_faults
+            detected, value = self._check_fault(fault_name, fault_cfg, metrics, hip_velocity, currently_active)
             if detected:
+                self._active_faults.add(fault_name)
                 score -= fault_cfg["deduction"]
                 active_faults.append({
                     "name": fault_name,
@@ -106,6 +112,8 @@ class FormScorer:
                     "value": value,
                     "deduction": fault_cfg["deduction"],
                 })
+            else:
+                self._active_faults.discard(fault_name)
 
         score = max(0, score)
 
@@ -116,50 +124,53 @@ class FormScorer:
             "is_good": len(active_faults) == 0,
         }
 
-    def _check_fault(self, fault_name, fault_cfg, metrics, hip_velocity):
-        """Check if a specific fault is detected. Returns (detected, value)."""
+    def _check_fault(self, fault_name, fault_cfg, metrics, hip_velocity, currently_active=False):
+        """Check if a specific fault is detected using hysteresis. Returns (detected, value)."""
+        value = None
+
         if fault_name == "back_rounding":
-            angle = metrics.get("back_angle")
-            if angle is not None and angle > fault_cfg["threshold_deg"]:
-                return True, angle
+            value = metrics.get("back_angle")
         elif fault_name == "insufficient_depth":
-            angle = metrics.get("knee_angle")
-            if angle is not None and angle > fault_cfg["threshold_deg"]:
-                return True, angle
+            value = metrics.get("knee_angle")
         elif fault_name == "knee_cave":
-            cave = metrics.get("knee_cave")
-            if cave is not None and cave > fault_cfg["threshold_deg"]:
-                return True, cave
+            value = metrics.get("knee_cave")
         elif fault_name == "asymmetric_descent":
-            asym = metrics.get("asymmetry")
-            if asym is not None and asym > fault_cfg["threshold_deg"]:
-                return True, asym
+            value = metrics.get("asymmetry")
         elif fault_name == "bounce_at_bottom":
             if len(hip_velocity) >= 2:
                 vel_threshold = fault_cfg.get("velocity_threshold", 0.05)
-                # Bounce = rapid direction change (negative then positive quickly)
                 if hip_velocity[-1] < -vel_threshold and hip_velocity[-2] > vel_threshold:
                     return True, abs(hip_velocity[-1])
+            return False, None
         elif fault_name == "bar_path_deviation":
             pass  # Requires wrist tracking, placeholder for deadlift
         elif fault_name == "hip_shoot":
             pass  # Requires multi-frame analysis, placeholder for deadlift
         elif fault_name == "elbow_swing":
-            angle = metrics.get("shoulder_angle")
-            if angle is not None and angle > fault_cfg["threshold_deg"]:
-                return True, angle
+            value = metrics.get("shoulder_angle")
         elif fault_name == "insufficient_contraction":
-            angle = metrics.get("elbow_angle")
-            if angle is not None and angle > fault_cfg["threshold_deg"]:
-                return True, angle
-        return False, None
+            value = metrics.get("elbow_angle")
+
+        if value is None:
+            return False, None
+
+        trigger = fault_cfg["threshold_deg"]
+        clear_margin = fault_cfg.get("clear_margin_deg", 5)
+
+        if currently_active:
+            if value <= trigger - clear_margin:
+                return False, value
+            return True, value
+        else:
+            if value >= trigger:
+                return True, value
+            return False, None
 
     def _get_angle_points(self, landmarks, angle_name):
-        """Get primary side points for angle calculation."""
+        """Get primary side 3D points for angle calculation."""
         angles_cfg = self._angles_config
         cfg = angles_cfg.get(angle_name)
         if not cfg:
-            # Try reading from exercise root angles
             return None
         names = cfg.get("points", [])
         if len(names) != 3:
@@ -167,11 +178,17 @@ class FormScorer:
         indices = [self._landmark_map.get(n) for n in names]
         if None in indices:
             return None
-        pts = [self._calc.get_landmark_xy(landmarks, i) for i in indices]
-        return pts
+        # Prefer 3D world landmarks
+        wl = getattr(self, '_world_landmarks', None)
+        if wl is not None:
+            pts = [self._calc.get_landmark_xyz(wl, i) for i in indices]
+            if all(p is not None for p in pts):
+                return pts
+        # Fallback to 2D
+        return [self._calc.get_landmark_xy(landmarks, i) for i in indices]
 
     def _get_angle_points_secondary(self, landmarks, angle_name):
-        """Get secondary side points for angle calculation."""
+        """Get secondary side 3D points for angle calculation."""
         angles_cfg = self._angles_config
         cfg = angles_cfg.get(angle_name)
         if not cfg:
@@ -182,25 +199,41 @@ class FormScorer:
         indices = [self._landmark_map.get(n) for n in names]
         if None in indices:
             return None
-        pts = [self._calc.get_landmark_xy(landmarks, i) for i in indices]
-        return pts
+        wl = getattr(self, '_world_landmarks', None)
+        if wl is not None:
+            pts = [self._calc.get_landmark_xyz(wl, i) for i in indices]
+            if all(p is not None for p in pts):
+                return pts
+        return [self._calc.get_landmark_xy(landmarks, i) for i in indices]
 
     def _get_back_config(self):
         angles_cfg = self._angles_config
         return angles_cfg.get("back")
 
     def _calculate_knee_cave(self, landmarks):
-        """Calculate knee cave for both legs, return max."""
+        """Calculate knee cave using 2D landmarks (fallback)."""
         lm = self._landmark_map
         left_knee = self._calc.get_landmark_xy(landmarks, lm.get("left_knee", 25))
         left_ankle = self._calc.get_landmark_xy(landmarks, lm.get("left_ankle", 27))
         left_foot = self._calc.get_landmark_xy(landmarks, lm.get("left_foot_index", 31))
-
         right_knee = self._calc.get_landmark_xy(landmarks, lm.get("right_knee", 26))
         right_ankle = self._calc.get_landmark_xy(landmarks, lm.get("right_ankle", 28))
         right_foot = self._calc.get_landmark_xy(landmarks, lm.get("right_foot_index", 32))
-
         left_cave = self._calc.calculate_knee_cave(left_knee, left_ankle, left_foot)
         right_cave = self._calc.calculate_knee_cave(right_knee, right_ankle, right_foot)
+        return max(left_cave, right_cave)
 
+    def _calculate_knee_cave_3d(self, world_landmarks):
+        """Calculate knee cave using 3D world landmarks."""
+        lm = self._landmark_map
+        left_knee = self._calc.get_landmark_xyz(world_landmarks, lm.get("left_knee", 25))
+        left_ankle = self._calc.get_landmark_xyz(world_landmarks, lm.get("left_ankle", 27))
+        left_foot = self._calc.get_landmark_xyz(world_landmarks, lm.get("left_foot_index", 31))
+        right_knee = self._calc.get_landmark_xyz(world_landmarks, lm.get("right_knee", 26))
+        right_ankle = self._calc.get_landmark_xyz(world_landmarks, lm.get("right_ankle", 28))
+        right_foot = self._calc.get_landmark_xyz(world_landmarks, lm.get("right_foot_index", 32))
+        if any(p is None for p in [left_knee, left_ankle, left_foot, right_knee, right_ankle, right_foot]):
+            return None
+        left_cave = self._calc.calculate_knee_cave(left_knee, left_ankle, left_foot)
+        right_cave = self._calc.calculate_knee_cave(right_knee, right_ankle, right_foot)
         return max(left_cave, right_cave)

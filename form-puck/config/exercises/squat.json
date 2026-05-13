@@ -33,6 +33,9 @@
     },
     "rep_detection": {
         "state_machine": "descending_ascending",
+        "stand_min": 160,
+        "descent_start": 145,
+        "bottom_target": 90,
         "bottom_hold_frames": 9,
         "hip_knee_ratio_threshold": 0.95,
         "standing_stability_frames": 5
@@ -43,21 +46,25 @@
             "back_rounding": {
                 "deduction": 20,
                 "threshold_deg": 45,
+                "clear_margin_deg": 5,
                 "description": "Back rounding - excessive forward lean"
             },
             "insufficient_depth": {
                 "deduction": 15,
                 "threshold_deg": 110,
+                "clear_margin_deg": 5,
                 "description": "Insufficient depth - go deeper"
             },
             "knee_cave": {
                 "deduction": 15,
                 "threshold_deg": 15,
+                "clear_margin_deg": 5,
                 "description": "Knee cave detected - push knees out"
             },
             "asymmetric_descent": {
                 "deduction": 10,
                 "threshold_deg": 10,
+                "clear_margin_deg": 5,
                 "description": "Asymmetric descent - even out both sides"
             },
             "bounce_at_bottom": {

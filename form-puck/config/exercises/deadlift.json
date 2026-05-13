@@ -42,16 +42,19 @@
             "back_rounding": {
                 "deduction": 25,
                 "threshold_deg": 30,
+                "clear_margin_deg": 5,
                 "description": "Back rounding - keep spine neutral"
             },
             "bar_path_deviation": {
                 "deduction": 15,
                 "threshold_deg": 15,
+                "clear_margin_deg": 5,
                 "description": "Bar drifting from legs"
             },
             "hip_shoot": {
                 "deduction": 20,
                 "threshold_deg": 10,
+                "clear_margin_deg": 5,
                 "description": "Hips rising before chest"
             }
         }

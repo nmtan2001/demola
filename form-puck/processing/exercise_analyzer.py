@@ -44,7 +44,7 @@ class ExerciseAnalyzer:
             hip_velocity = []
 
         # Update rep state machine
-        rep_info = self._rep_detector.update(landmarks)
+        rep_info = self._rep_detector.update(landmarks, world_landmarks)
 
         # Evaluate form (only meaningful during active movement)
         form_eval = self._form_scorer.evaluate(

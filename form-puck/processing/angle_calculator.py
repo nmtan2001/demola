@@ -40,21 +40,21 @@ class AngleCalculator:
 
     @staticmethod
     def calculate_vertical_angle(upper, lower):
-        """Calculate forward lean angle relative to vertical.
+        """Calculate forward lean angle relative to vertical using 3D points.
 
         Args:
-            upper: shoulder point (x, y)
-            lower: hip point (x, y)
+            upper: shoulder point (x, y, z) in world coordinates
+            lower: hip point (x, y, z) in world coordinates
         Returns:
             Angle from vertical in degrees. 0 = perfectly upright.
         """
-        dx = upper[0] - lower[0]
-        dy = upper[1] - lower[1]
-        # In image coords, y increases downward, so negate dy for vertical ref
-        vertical = np.array([0.0, -1.0])
-        vec = np.array([dx, -dy])
-        vec = vec / (np.linalg.norm(vec) + 1e-8)
-
+        vec = np.array([upper[0] - lower[0], upper[1] - lower[1], upper[2] - lower[2]])
+        vec_norm = np.linalg.norm(vec)
+        if vec_norm < 1e-8:
+            return 0.0
+        vec = vec / vec_norm
+        # Vertical direction in MediaPipe world coords: y-axis points downward
+        vertical = np.array([0.0, 1.0, 0.0])
         cosine = np.dot(vertical, vec)
         cosine = np.clip(cosine, -1.0, 1.0)
         return np.degrees(np.arccos(cosine))
@@ -73,20 +73,19 @@ class AngleCalculator:
 
     @staticmethod
     def calculate_knee_cave(knee, ankle, foot_index):
-        """Detect knee cave (valgus collapse).
+        """Detect knee cave (valgus collapse) using 3D world coordinates.
 
-        Measures lateral deviation of knee relative to foot centerline.
+        Measures lateral deviation of knee relative to ankle-foot centerline.
 
         Args:
-            knee: knee point (x, y) - normalized 0-1
-            ankle: ankle point (x, y)
-            foot_index: foot index (toe) point (x, y)
+            knee: knee point (x, y, z) in world coordinates
+            ankle: ankle point (x, y, z)
+            foot_index: foot index (toe) point (x, y, z)
         Returns:
             Lateral deviation angle in degrees. 0 = perfect alignment.
         """
         foot_center_x = (ankle[0] + foot_index[0]) / 2.0
         lateral_deviation = knee[0] - foot_center_x
-        # Use vertical distance for angle calculation
         vertical_dist = abs(knee[1] - ankle[1])
         if vertical_dist < 1e-6:
             return 0.0

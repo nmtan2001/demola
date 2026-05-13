@@ -25,25 +25,25 @@ body { background: #1a1a2e; color: #e0e0e0; font-family: -apple-system, Arial, s
 .left { flex: 7; display: flex; align-items: center; justify-content: center; padding: 10px; }
 .left img { max-width: 100%; max-height: 100%; border-radius: 8px; border: 2px solid #16213e; }
 .right { flex: 3; min-width: 280px; max-width: 350px; padding: 16px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
-.led { width: 70px; height: 70px; border-radius: 50%; margin: 0 auto; transition: background-color 0.15s; }
-.led-green { background: #00c853; box-shadow: 0 0 20px #00c85366; }
-.led-red { background: #ff1744; box-shadow: 0 0 20px #ff174466; animation: pulse 0.5s infinite alternate; }
-.led-yellow { background: #ffd600; box-shadow: 0 0 20px #ffd60066; }
+.led { width: 80px; height: 80px; border-radius: 50%; margin: 0 auto; transition: background-color 0.15s; }
+.led-green { background: #00c853; box-shadow: 0 0 30px #00c85388; }
+.led-red { background: #ff1744; box-shadow: 0 0 30px #ff174488; animation: pulse 0.5s infinite alternate; }
+.led-yellow { background: #ffd600; box-shadow: 0 0 30px #ffd60088; }
 @keyframes pulse { from { opacity: 1; } to { opacity: 0.5; } }
-.rep-counter { font-size: 36px; font-weight: bold; text-align: center; color: #00d4ff; }
-.score-bar-bg { background: #2a2a4a; border-radius: 6px; height: 24px; position: relative; overflow: hidden; }
+.rep-counter { font-size: 48px; font-weight: bold; text-align: center; color: #00d4ff; }
+.score-bar-bg { background: #2a2a4a; border-radius: 6px; height: 30px; position: relative; overflow: hidden; }
 .score-bar-fill { height: 100%; border-radius: 6px; transition: width 0.15s, background-color 0.15s; }
-.score-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 13px; font-weight: bold; }
-.state { font-size: 16px; font-weight: bold; text-align: center; color: #888; }
-.section-title { font-size: 12px; font-weight: bold; color: #aaa; margin-top: 6px; }
+.score-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 16px; font-weight: bold; }
+.state { font-size: 20px; font-weight: bold; text-align: center; color: #888; padding: 4px 0; }
+.section-title { font-size: 14px; font-weight: bold; color: #aaa; margin-top: 8px; }
 .metrics { display: flex; flex-direction: column; gap: 4px; }
-.metric-row { display: flex; justify-content: space-between; padding: 2px 0; }
-.metric-name { color: #999; font-size: 13px; }
-.metric-val { color: #00d4ff; font-weight: bold; font-size: 13px; }
-.faults { color: #ff5252; font-size: 12px; min-height: 30px; line-height: 1.4; }
-select { background: #2a2a4a; color: #e0e0e0; border: 1px solid #3a3a5a; padding: 6px 10px; border-radius: 4px; font-size: 14px; width: 100%; }
+.metric-row { display: flex; justify-content: space-between; padding: 3px 0; }
+.metric-name { color: #999; font-size: 15px; }
+.metric-val { color: #00d4ff; font-weight: bold; font-size: 15px; }
+.faults { color: #ff5252; font-size: 15px; font-weight: bold; min-height: 30px; line-height: 1.4; padding: 4px 0; }
+select { background: #2a2a4a; color: #e0e0e0; border: 1px solid #3a3a5a; padding: 8px 12px; border-radius: 4px; font-size: 16px; width: 100%; }
 .btn-row { display: flex; gap: 8px; }
-button { flex: 1; padding: 10px; border: none; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; color: white; }
+button { flex: 1; padding: 12px; border: none; border-radius: 6px; font-weight: bold; font-size: 16px; cursor: pointer; color: white; }
 .btn-start { background: #00c853; }
 .btn-start:hover { background: #00e676; }
 .btn-start.active { background: #ff9800; }
@@ -274,27 +274,6 @@ class FormPuckServer:
                 frame, landmarks, form_eval.get("angles", {}), landmark_map
             )
 
-        # Debug overlay - show raw values on frame
-        debug_lines = [
-            f"State: {rep_info['state'].value}",
-            f"Reps: {rep_info['rep_count']}",
-        ]
-        if pose_result:
-            lm = landmarks
-            # Show visibility of key joints
-            debug_lines.append(f"L_hip vis: {lm[23][3]:.2f}  L_knee vis: {lm[25][3]:.2f}")
-            debug_lines.append(f"R_hip vis: {lm[24][3]:.2f}  R_knee vis: {lm[26][3]:.2f}")
-        angles = form_eval.get("angles", {})
-        if "knee_angle" in angles:
-            debug_lines.append(f"Knee angle: {angles['knee_angle']:.1f}")
-        else:
-            debug_lines.append("Knee angle: N/A")
-        if "back_angle" in angles:
-            debug_lines.append(f"Back angle: {angles['back_angle']:.1f}")
-        for i, line in enumerate(debug_lines):
-            cv2.putText(frame, line, (10, 25 + i * 22),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1, cv2.LINE_AA)
-
         # Audio feedback
         if form_eval.get("is_good", True):
             self._prev_form_good = True
@@ -302,6 +281,10 @@ class FormPuckServer:
             if self._prev_form_good:
                 self._audio.play_fault()
             self._prev_form_good = False
+            # Voice coach: speak the first (most important) fault
+            faults = form_eval.get("faults", [])
+            if faults:
+                self._audio.speak_fault(faults[0]["name"])
 
         # Rep completion
         if rep_info["rep_completed"]:

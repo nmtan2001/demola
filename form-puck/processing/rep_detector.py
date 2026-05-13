@@ -25,11 +25,6 @@ class SquatRepDetector:
     drives a 4-state machine with angle thresholds.
     """
 
-    # Thresholds matching demo.html
-    STAND_MIN = 160
-    DESCENT_START = 145
-    BOTTOM_TARGET = 90
-
     def __init__(self, config):
         self._state = RepState.STANDING
         self._rep_count = 0
@@ -37,6 +32,9 @@ class SquatRepDetector:
         self._calc = AngleCalculator()
         self._in_rep = False
         self._reached_depth = False
+        self._stand_min = config.get("stand_min", 160)
+        self._descent_start = config.get("descent_start", 145)
+        self._bottom_target = config.get("bottom_target", 90)
 
     @property
     def state(self):
@@ -50,12 +48,11 @@ class SquatRepDetector:
     def in_rep(self):
         return self._in_rep
 
-    def update(self, landmarks):
+    def update(self, landmarks, world_landmarks=None):
         if landmarks is None:
             return self._make_result(False)
 
-        # Pick the more visible side (same as demo.html)
-        knee_angle = self._get_knee_angle(landmarks)
+        knee_angle = self._get_knee_angle(landmarks, world_landmarks)
         if knee_angle is None:
             return self._make_result(False)
 
@@ -63,25 +60,25 @@ class SquatRepDetector:
         rep_completed = False
 
         if self._state == RepState.STANDING:
-            if knee_angle < self.DESCENT_START:
+            if knee_angle < self._descent_start:
                 self._state = RepState.DESCENDING
                 self._in_rep = True
                 self._reached_depth = False
 
         elif self._state == RepState.DESCENDING:
-            if knee_angle < self.BOTTOM_TARGET:
+            if knee_angle < self._bottom_target:
                 self._reached_depth = True
                 self._state = RepState.BOTTOM
-            elif knee_angle > self.STAND_MIN:
+            elif knee_angle > self._stand_min:
                 self._state = RepState.STANDING
                 self._in_rep = False
 
         elif self._state == RepState.BOTTOM:
-            if knee_angle > self.BOTTOM_TARGET + 10:
+            if knee_angle > self._bottom_target + 10:
                 self._state = RepState.ASCENDING
 
         elif self._state == RepState.ASCENDING:
-            if knee_angle > self.STAND_MIN:
+            if knee_angle > self._stand_min:
                 self._state = RepState.STANDING
                 self._in_rep = False
                 if self._reached_depth:
@@ -91,20 +88,28 @@ class SquatRepDetector:
 
         return self._make_result(rep_completed)
 
-    def _get_knee_angle(self, landmarks):
-        """Get knee angle from the more visible side."""
+    def _get_knee_angle(self, landmarks, world_landmarks=None):
+        """Get knee angle from the more visible side. Prefers 3D world landmarks."""
         left_vis = (landmarks[23][3] + landmarks[25][3] + landmarks[27][3]) / 3.0
         right_vis = (landmarks[24][3] + landmarks[26][3] + landmarks[28][3]) / 3.0
 
         if left_vis >= right_vis:
-            hip = self._calc.get_landmark_xy(landmarks, 23)
-            knee = self._calc.get_landmark_xy(landmarks, 25)
-            ankle = self._calc.get_landmark_xy(landmarks, 27)
+            hip_idx, knee_idx, ankle_idx = 23, 25, 27
         else:
-            hip = self._calc.get_landmark_xy(landmarks, 24)
-            knee = self._calc.get_landmark_xy(landmarks, 26)
-            ankle = self._calc.get_landmark_xy(landmarks, 28)
+            hip_idx, knee_idx, ankle_idx = 24, 26, 28
 
+        # Prefer 3D world landmarks for camera-angle-independent angles
+        if world_landmarks is not None:
+            hip = self._calc.get_landmark_xyz(world_landmarks, hip_idx)
+            knee = self._calc.get_landmark_xyz(world_landmarks, knee_idx)
+            ankle = self._calc.get_landmark_xyz(world_landmarks, ankle_idx)
+            if hip is not None and knee is not None and ankle is not None:
+                return self._calc.calculate_angle(hip, knee, ankle)
+
+        # Fallback to 2D
+        hip = self._calc.get_landmark_xy(landmarks, hip_idx)
+        knee = self._calc.get_landmark_xy(landmarks, knee_idx)
+        ankle = self._calc.get_landmark_xy(landmarks, ankle_idx)
         return self._calc.calculate_angle(hip, knee, ankle)
 
     def _make_result(self, rep_completed):
@@ -155,11 +160,11 @@ class CurlRepDetector:
     def in_rep(self):
         return self._in_rep
 
-    def update(self, landmarks):
+    def update(self, landmarks, world_landmarks=None):
         if landmarks is None:
             return self._make_result(False)
 
-        elbow_angle = self._get_elbow_angle(landmarks)
+        elbow_angle = self._get_elbow_angle(landmarks, world_landmarks)
         if elbow_angle is None:
             return self._make_result(False)
 
@@ -204,7 +209,8 @@ class CurlRepDetector:
 
         return self._make_result(rep_completed)
 
-    def _get_elbow_angle(self, landmarks):
+    def _get_elbow_angle(self, landmarks, world_landmarks=None):
+        """Get elbow angle from the more visible side. Prefers 3D world landmarks."""
         lm = self._landmark_map
         left_score = self._get_avg_visibility(landmarks, [
             lm.get("left_shoulder", 11), lm.get("left_elbow", 13),
@@ -216,18 +222,26 @@ class CurlRepDetector:
         ])
 
         if left_score >= right_score:
-            pts = [
-                self._calc.get_landmark_xy(landmarks, lm.get("left_shoulder", 11)),
-                self._calc.get_landmark_xy(landmarks, lm.get("left_elbow", 13)),
-                self._calc.get_landmark_xy(landmarks, lm.get("left_wrist", 15)),
+            indices = [
+                lm.get("left_shoulder", 11),
+                lm.get("left_elbow", 13),
+                lm.get("left_wrist", 15),
             ]
         else:
-            pts = [
-                self._calc.get_landmark_xy(landmarks, lm.get("right_shoulder", 12)),
-                self._calc.get_landmark_xy(landmarks, lm.get("right_elbow", 14)),
-                self._calc.get_landmark_xy(landmarks, lm.get("right_wrist", 16)),
+            indices = [
+                lm.get("right_shoulder", 12),
+                lm.get("right_elbow", 14),
+                lm.get("right_wrist", 16),
             ]
 
+        # Prefer 3D world landmarks
+        if world_landmarks is not None:
+            pts = [self._calc.get_landmark_xyz(world_landmarks, i) for i in indices]
+            if all(p is not None for p in pts):
+                return self._calc.calculate_angle(*pts)
+
+        # Fallback to 2D
+        pts = [self._calc.get_landmark_xy(landmarks, i) for i in indices]
         return self._calc.calculate_angle(*pts)
 
     def _get_avg_visibility(self, landmarks, indices):

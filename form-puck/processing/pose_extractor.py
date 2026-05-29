@@ -65,7 +65,8 @@ class PoseExtractor:
 
         # Extract first detected pose
         pose_lm = result.pose_landmarks[0]
-        landmarks = np.array([[lm.x, lm.y, lm.z, lm.visibility] for lm in pose_lm])
+        h, w = frame.shape[:2]
+        landmarks = np.array([[lm.x * w, lm.y * h, lm.z * w, lm.visibility] for lm in pose_lm])
 
         world_landmarks = None
         if result.pose_world_landmarks and len(result.pose_world_landmarks) > 0:
@@ -82,8 +83,8 @@ class PoseExtractor:
             ),
         }
 
-    def draw_landmarks(self, frame, pose_result):
-        """Draw skeleton overlay on frame."""
+    def draw_landmarks(self, frame, pose_result, is_good_form=True):
+        """Draw skeleton overlay on frame. Color depends on form quality."""
         if pose_result is None:
             return
 
@@ -93,6 +94,14 @@ class PoseExtractor:
 
         import cv2
         h, w = frame.shape[:2]
+
+        # Choose colors based on form quality
+        if is_good_form:
+            line_color = (0, 255, 0)   # green
+            dot_color = (0, 255, 0)    # green
+        else:
+            line_color = (0, 0, 255)   # red
+            dot_color = (0, 165, 255)  # orange
 
         # Build pixel position list
         points = []
@@ -108,11 +117,11 @@ class PoseExtractor:
             end_idx = conn[1] if isinstance(conn, (list, tuple)) else conn.end
             if start_idx < len(points) and end_idx < len(points):
                 cv2.line(frame, points[start_idx], points[end_idx],
-                         (0, 255, 255), 2, cv2.LINE_AA)
+                         line_color, 2, cv2.LINE_AA)
 
         # Draw landmark points
         for px, py in points:
-            cv2.circle(frame, (px, py), 3, (0, 255, 0), -1, cv2.LINE_AA)
+            cv2.circle(frame, (px, py), 3, dot_color, -1, cv2.LINE_AA)
 
     def release(self):
         self._landmarker.close()

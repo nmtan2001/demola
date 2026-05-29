@@ -57,8 +57,9 @@ class FormScorer:
         # Back angle (forward lean from vertical) - use 3D world landmarks
         back_cfg = self._get_back_config()
         if back_cfg and world_landmarks is not None:
-            shoulder_idx = self._landmark_map.get("left_shoulder", 11)
-            hip_idx = self._landmark_map.get("left_hip", 23)
+            pts_names = back_cfg.get("points", ["left_shoulder", "left_hip"])
+            shoulder_idx = self._landmark_map.get(pts_names[0], 11)
+            hip_idx = self._landmark_map.get(pts_names[1], 23)
             shoulder = self._calc.get_landmark_xyz(world_landmarks, shoulder_idx)
             hip = self._calc.get_landmark_xyz(world_landmarks, hip_idx)
             if shoulder is not None and hip is not None:
@@ -96,11 +97,19 @@ class FormScorer:
                 metrics["knee_angle_left"] - metrics["knee_angle_right"]
             )
 
-        # Evaluate faults
+        # Evaluate faults - skip if not in an active rep state
         score = self._scoring_config["base_score"]
         active_faults = []
+        current_state = rep_state.value if rep_state else "READY"
 
         for fault_name, fault_cfg in self._faults_config.items():
+            # State-aware: only check during specified rep phases
+            active_during = fault_cfg.get("active_during")
+            if active_during and current_state not in active_during:
+                # Clear the fault if it was active but we left the active phase
+                self._active_faults.discard(fault_name)
+                continue
+
             currently_active = fault_name in self._active_faults
             detected, value = self._check_fault(fault_name, fault_cfg, metrics, hip_velocity, currently_active)
             if detected:
@@ -128,10 +137,11 @@ class FormScorer:
         """Check if a specific fault is detected using hysteresis. Returns (detected, value)."""
         value = None
 
-        if fault_name == "back_rounding":
+        if fault_name == "back_rounding" or fault_name == "arching_back":
             value = metrics.get("back_angle")
-        elif fault_name == "insufficient_depth":
-            value = metrics.get("knee_angle")
+        elif fault_name == "insufficient_depth" or fault_name == "half_rep":
+            # half_rep uses elbow_angle for pushup (threshold > 100 = not deep enough)
+            value = metrics.get("elbow_angle") if metrics.get("elbow_angle") is not None else metrics.get("knee_angle")
         elif fault_name == "knee_cave":
             value = metrics.get("knee_cave")
         elif fault_name == "asymmetric_descent":
@@ -146,25 +156,49 @@ class FormScorer:
             pass  # Requires wrist tracking, placeholder for deadlift
         elif fault_name == "hip_shoot":
             pass  # Requires multi-frame analysis, placeholder for deadlift
-        elif fault_name == "elbow_swing":
+        elif fault_name == "elbow_swing" or fault_name == "elbow_flare":
             value = metrics.get("shoulder_angle")
         elif fault_name == "insufficient_contraction":
             value = metrics.get("elbow_angle")
+        elif fault_name == "incomplete_lockout":
+            # Elbow not fully extended: triggers when elbow_angle is below threshold
+            value = metrics.get("elbow_angle")
+        elif fault_name == "sagging_hips" or fault_name == "piking_hips":
+            # Body alignment: deviation of hip angle from 180 (straight body)
+            hip_angle = metrics.get("hip_angle")
+            if hip_angle is not None:
+                value = abs(180 - hip_angle)
+        elif fault_name == "knee_over_toe":
+            # Front knee too far forward: knee angle too small
+            value = metrics.get("knee_angle")
 
         if value is None:
             return False, None
 
         trigger = fault_cfg["threshold_deg"]
         clear_margin = fault_cfg.get("clear_margin_deg", 5)
+        direction = fault_cfg.get("direction", "above")
 
-        if currently_active:
-            if value <= trigger - clear_margin:
-                return False, value
-            return True, value
-        else:
-            if value >= trigger:
+        if direction == "below":
+            # Trigger when value falls below threshold (e.g. incomplete_lockout, knee_over_toe)
+            if currently_active:
+                if value >= trigger + clear_margin:
+                    return False, value
                 return True, value
-            return False, None
+            else:
+                if value <= trigger:
+                    return True, value
+                return False, None
+        else:
+            # Trigger when value rises above threshold (default)
+            if currently_active:
+                if value <= trigger - clear_margin:
+                    return False, value
+                return True, value
+            else:
+                if value >= trigger:
+                    return True, value
+                return False, None
 
     def _get_angle_points(self, landmarks, angle_name):
         """Get primary side 3D points for angle calculation."""
@@ -178,9 +212,10 @@ class FormScorer:
         indices = [self._landmark_map.get(n) for n in names]
         if None in indices:
             return None
-        # Prefer 3D world landmarks
+        # Prefer 3D world landmarks unless configured for 2D only
+        use_2d = cfg.get("use_2d_only", False)
         wl = getattr(self, '_world_landmarks', None)
-        if wl is not None:
+        if not use_2d and wl is not None:
             pts = [self._calc.get_landmark_xyz(wl, i) for i in indices]
             if all(p is not None for p in pts):
                 return pts
@@ -199,8 +234,9 @@ class FormScorer:
         indices = [self._landmark_map.get(n) for n in names]
         if None in indices:
             return None
+        use_2d = cfg.get("use_2d_only", False)
         wl = getattr(self, '_world_landmarks', None)
-        if wl is not None:
+        if not use_2d and wl is not None:
             pts = [self._calc.get_landmark_xyz(wl, i) for i in indices]
             if all(p is not None for p in pts):
                 return pts

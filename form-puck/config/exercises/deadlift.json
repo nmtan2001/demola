@@ -32,29 +32,36 @@
     },
     "rep_detection": {
         "state_machine": "descending_ascending",
-        "bottom_hold_frames": 6,
-        "hip_knee_ratio_threshold": 1.0,
-        "standing_stability_frames": 5
+        "angle_points": ["left_shoulder", "left_hip", "left_knee"],
+        "angle_points_secondary": ["right_shoulder", "right_hip", "right_knee"],
+        "stand_min": 165,
+        "descent_start": 145,
+        "bottom_target": 95,
+        "peak_hold_frames": 3,
+        "min_rep_frames": 24
     },
     "scoring": {
         "base_score": 100,
         "faults": {
             "back_rounding": {
                 "deduction": 25,
-                "threshold_deg": 30,
+                "threshold_deg": 60,
                 "clear_margin_deg": 5,
-                "description": "Back rounding - keep spine neutral"
+                "active_during": ["ACTIVE", "PEAK", "RETURN"],
+                "description": "Torso forward lean - keep chest up"
             },
             "bar_path_deviation": {
                 "deduction": 15,
                 "threshold_deg": 15,
                 "clear_margin_deg": 5,
+                "active_during": ["ACTIVE", "PEAK"],
                 "description": "Bar drifting from legs"
             },
             "hip_shoot": {
                 "deduction": 20,
                 "threshold_deg": 10,
                 "clear_margin_deg": 5,
+                "active_during": ["RETURN"],
                 "description": "Hips rising before chest"
             }
         }

@@ -53,8 +53,9 @@ class AngleCalculator:
         if vec_norm < 1e-8:
             return 0.0
         vec = vec / vec_norm
-        # Vertical direction in MediaPipe world coords: y-axis points downward
-        vertical = np.array([0.0, 1.0, 0.0])
+        # Vertical "up" in MediaPipe world coords is -Y (Y points downward).
+        # Use -Y so upright torso (shoulder above hip) yields angle ~0.
+        vertical = np.array([0.0, -1.0, 0.0])
         cosine = np.dot(vertical, vec)
         cosine = np.clip(cosine, -1.0, 1.0)
         return np.degrees(np.arccos(cosine))
@@ -76,6 +77,7 @@ class AngleCalculator:
         """Detect knee cave (valgus collapse) using 3D world coordinates.
 
         Measures lateral deviation of knee relative to ankle-foot centerline.
+        Only penalizes inward knee collapse (valgus deviation), allowing outward flaring.
 
         Args:
             knee: knee point (x, y, z) in world coordinates
@@ -85,9 +87,10 @@ class AngleCalculator:
             Lateral deviation angle in degrees. 0 = perfect alignment.
         """
         foot_center_x = (ankle[0] + foot_index[0]) / 2.0
-        lateral_deviation = knee[0] - foot_center_x
+        # Inward cave occurs when knee is closer to the body midline (x=0) than the foot center
+        lateral_deviation = max(0.0, abs(foot_center_x) - abs(knee[0]))
         vertical_dist = abs(knee[1] - ankle[1])
         if vertical_dist < 1e-6:
             return 0.0
-        angle = np.degrees(np.arctan(abs(lateral_deviation) / vertical_dist))
+        angle = np.degrees(np.arctan(lateral_deviation / vertical_dist))
         return angle

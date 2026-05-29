@@ -18,6 +18,8 @@ class ExerciseAnalyzer:
         )
         self._form_scorer = FormScorer(self._config)
         self._current_evaluation = None
+        self._rep_faults_accumulated = {}
+        self._rep_scores = []
 
     @property
     def name(self):
@@ -43,6 +45,8 @@ class ExerciseAnalyzer:
         if hip_velocity is None:
             hip_velocity = []
 
+        was_in_rep = self._rep_detector.in_rep
+
         # Update rep state machine
         rep_info = self._rep_detector.update(landmarks, world_landmarks)
 
@@ -51,10 +55,41 @@ class ExerciseAnalyzer:
             landmarks, world_landmarks, rep_info["state"], hip_velocity
         )
 
-        # If rep completed, record the form score
+        # Reset accumulators on new rep start
+        if not was_in_rep and self._rep_detector.in_rep:
+            self._rep_faults_accumulated = {}
+            self._rep_scores = []
+
+        # Accumulate faults and scores while actively in a rep
+        if self._rep_detector.in_rep:
+            self._rep_scores.append(form_eval["score"])
+            for fault in form_eval["faults"]:
+                name = fault["name"]
+                if name not in self._rep_faults_accumulated:
+                    self._rep_faults_accumulated[name] = fault
+                else:
+                    if fault["value"] is not None:
+                        prev_val = self._rep_faults_accumulated[name]["value"]
+                        # Store the maximum (worst) deviation value
+                        if prev_val is None or fault["value"] > prev_val:
+                            self._rep_faults_accumulated[name]["value"] = fault["value"]
+
+        # If rep completed, record the accumulated form score and faults
         if rep_info["rep_completed"]:
-            rep_info["form_score"] = form_eval["score"]
-            rep_info["faults"] = form_eval["faults"]
+            final_score = min(self._rep_scores) if self._rep_scores else form_eval["score"]
+            final_faults = list(self._rep_faults_accumulated.values())
+
+            rep_info["form_score"] = final_score
+            rep_info["faults"] = final_faults
+
+            # Override the current frame's evaluation for reporting
+            form_eval["score"] = final_score
+            form_eval["faults"] = final_faults
+            form_eval["is_good"] = len(final_faults) == 0
+
+            # Clear accumulators for the next rep
+            self._rep_faults_accumulated = {}
+            self._rep_scores = []
 
         self._current_evaluation = form_eval
 
@@ -66,6 +101,8 @@ class ExerciseAnalyzer:
     def reset(self):
         self._rep_detector.reset()
         self._current_evaluation = None
+        self._rep_faults_accumulated = {}
+        self._rep_scores = []
 
     @staticmethod
     def list_available_exercises(exercises_dir="config/exercises"):

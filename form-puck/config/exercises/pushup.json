@@ -1,0 +1,71 @@
+{
+    "name": "Push-up",
+    "landmarks": {
+        "left_shoulder": 11,
+        "right_shoulder": 12,
+        "left_elbow": 13,
+        "right_elbow": 14,
+        "left_wrist": 15,
+        "right_wrist": 16,
+        "left_hip": 23,
+        "right_hip": 24,
+        "left_knee": 25,
+        "right_knee": 26,
+        "left_ankle": 27,
+        "right_ankle": 28
+    },
+    "angles": {
+        "elbow": {
+            "points": ["left_shoulder", "left_elbow", "left_wrist"],
+            "points_secondary": ["right_shoulder", "right_elbow", "right_wrist"],
+            "ideal_min": 70,
+            "ideal_max": 100
+        },
+        "hip": {
+            "points": ["left_shoulder", "left_hip", "left_ankle"],
+            "points_secondary": ["right_shoulder", "right_hip", "right_ankle"],
+            "ideal_min": 160,
+            "ideal_max": 195
+        },
+        "back": {
+            "points": ["left_shoulder", "left_hip"],
+            "vertical_threshold": 45
+        }
+    },
+    "rep_detection": {
+        "state_machine": "descending_ascending",
+        "angle_points": ["left_shoulder", "left_elbow", "left_wrist"],
+        "angle_points_secondary": ["right_shoulder", "right_elbow", "right_wrist"],
+        "stand_min": 160,
+        "descent_start": 140,
+        "bottom_target": 90,
+        "peak_hold_frames": 3,
+        "min_rep_frames": 20
+    },
+    "scoring": {
+        "base_score": 100,
+        "faults": {
+            "sagging_hips": {
+                "deduction": 20,
+                "threshold_deg": 20,
+                "clear_margin_deg": 5,
+                "active_during": ["ACTIVE", "PEAK"],
+                "description": "Hips sagging - keep body straight"
+            },
+            "half_rep": {
+                "deduction": 20,
+                "threshold_deg": 100,
+                "clear_margin_deg": 5,
+                "active_during": ["ACTIVE"],
+                "description": "Half rep - go lower"
+            },
+            "asymmetric_descent": {
+                "deduction": 10,
+                "threshold_deg": 15,
+                "clear_margin_deg": 5,
+                "active_during": ["ACTIVE", "PEAK"],
+                "description": "Uneven descent - keep both arms even"
+            }
+        }
+    }
+}

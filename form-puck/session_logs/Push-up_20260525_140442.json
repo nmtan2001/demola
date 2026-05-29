@@ -1,0 +1,109 @@
+{
+  "exercise": "Push-up",
+  "start_time": "2026-05-25T14:04:42.354763",
+  "end_time": "2026-05-25T14:05:55.313023",
+  "total_reps": 8,
+  "average_score": 100.0,
+  "best_rep": 100,
+  "worst_rep": 100,
+  "most_common_fault": null,
+  "fault_counts": {},
+  "reps": [
+    {
+      "rep": 1,
+      "form_score": 100,
+      "faults": [],
+      "angles": {
+        "hip_angle": 166.8,
+        "back_angle": 16.3,
+        "elbow_angle": 156.1,
+        "knee_cave": 20.5
+      },
+      "timestamp": "2026-05-25T14:05:11.502858"
+    },
+    {
+      "rep": 1,
+      "form_score": 100,
+      "faults": [],
+      "angles": {
+        "back_angle": 5.4,
+        "elbow_angle": 132.8,
+        "shoulder_angle": 33.2,
+        "knee_cave": 26.0
+      },
+      "timestamp": "2026-05-25T14:05:19.448608"
+    },
+    {
+      "rep": 2,
+      "form_score": 100,
+      "faults": [],
+      "angles": {
+        "back_angle": 6.1,
+        "elbow_angle": 117.8,
+        "shoulder_angle": 109.4,
+        "knee_cave": 14.6
+      },
+      "timestamp": "2026-05-25T14:05:30.864136"
+    },
+    {
+      "rep": 3,
+      "form_score": 100,
+      "faults": [],
+      "angles": {
+        "back_angle": 6.9,
+        "elbow_angle": 130.0,
+        "shoulder_angle": 116.6,
+        "knee_cave": 14.8
+      },
+      "timestamp": "2026-05-25T14:05:34.069727"
+    },
+    {
+      "rep": 4,
+      "form_score": 100,
+      "faults": [],
+      "angles": {
+        "back_angle": 5.7,
+        "elbow_angle": 122.7,
+        "shoulder_angle": 108.6,
+        "knee_cave": 13.5
+      },
+      "timestamp": "2026-05-25T14:05:37.119661"
+    },
+    {
+      "rep": 5,
+      "form_score": 100,
+      "faults": [],
+      "angles": {
+        "back_angle": 4.8,
+        "elbow_angle": 124.0,
+        "shoulder_angle": 112.4,
+        "knee_cave": 14.9
+      },
+      "timestamp": "2026-05-25T14:05:40.104252"
+    },
+    {
+      "rep": 6,
+      "form_score": 100,
+      "faults": [],
+      "angles": {
+        "back_angle": 5.4,
+        "elbow_angle": 128.2,
+        "shoulder_angle": 114.5,
+        "knee_cave": 14.4
+      },
+      "timestamp": "2026-05-25T14:05:46.688184"
+    },
+    {
+      "rep": 7,
+      "form_score": 100,
+      "faults": [],
+      "angles": {
+        "back_angle": 5.3,
+        "elbow_angle": 132.7,
+        "shoulder_angle": 122.2,
+        "knee_cave": 10.9
+      },
+      "timestamp": "2026-05-25T14:05:49.825756"
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+{
+  "exercise": "Squat",
+  "start_time": "2026-05-25T14:06:09.387206",
+  "end_time": "2026-05-25T14:06:51.710875",
+  "total_reps": 5,
+  "average_score": 100.0,
+  "best_rep": 100,
+  "worst_rep": 100,
+  "most_common_fault": null,
+  "fault_counts": {},
+  "reps": [
+    {
+      "rep": 1,
+      "form_score": 100,
+      "faults": [],
+      "angles": {
+        "knee_angle": 158.0,
+        "knee_angle_left": 154.8,
+        "knee_angle_right": 161.2,
+        "hip_angle": 165.9,
+        "back_angle": 21.5,
+        "knee_cave": 18.2,
+        "asymmetry": 6.3
+      },
+      "timestamp": "2026-05-25T14:06:30.882930"
+    },
+    {
+      "rep": 2,
+      "form_score": 100,
+      "faults": [],
+      "angles": {
+        "knee_angle": 164.0,
+        "knee_angle_left": 164.5,
+        "knee_angle_right": 163.5,
+        "hip_angle": 166.7,
+        "back_angle": 6.4,
+        "knee_cave": 12.2,
+        "asymmetry": 0.9
+      },
+      "timestamp": "2026-05-25T14:06:34.775159"
+    },
+    {
+      "rep": 3,
+      "form_score": 100,
+      "faults": [],
+      "angles": {
+        "knee_angle": 165.1,
+        "knee_angle_left": 166.6,
+        "knee_angle_right": 163.5,
+        "hip_angle": 164.0,
+        "back_angle": 4.6,
+        "knee_cave": 7.8,
+        "asymmetry": 3.1
+      },
+      "timestamp": "2026-05-25T14:06:37.920882"
+    },
+    {
+      "rep": 4,
+      "form_score": 100,
+      "faults": [],
+      "angles": {
+        "knee_angle": 166.4,
+        "knee_angle_left": 170.2,
+        "knee_angle_right": 162.6,
+        "hip_angle": 164.2,
+        "back_angle": 6.9,
+        "knee_cave": 6.7,
+        "asymmetry": 7.6
+      },
+      "timestamp": "2026-05-25T14:06:41.083642"
+    },
+    {
+      "rep": 5,
+      "form_score": 100,
+      "faults": [],
+      "angles": {
+        "knee_angle": 163.1,
+        "knee_angle_left": 163.0,
+        "knee_angle_right": 163.2,
+        "hip_angle": 165.5,
+        "back_angle": 3.9,
+        "knee_cave": 6.3,
+        "asymmetry": 0.3
+      },
+      "timestamp": "2026-05-25T14:06:45.746596"
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+    "name": "Overhead Press",
+    "landmarks": {
+        "left_shoulder": 11,
+        "right_shoulder": 12,
+        "left_elbow": 13,
+        "right_elbow": 14,
+        "left_wrist": 15,
+        "right_wrist": 16,
+        "left_hip": 23,
+        "right_hip": 24
+    },
+    "angles": {
+        "elbow": {
+            "points": ["left_shoulder", "left_elbow", "left_wrist"],
+            "points_secondary": ["right_shoulder", "right_elbow", "right_wrist"],
+            "ideal_min": 160,
+            "ideal_max": 180
+        },
+        "shoulder": {
+            "points": ["left_hip", "left_shoulder", "left_elbow"],
+            "points_secondary": ["right_hip", "right_shoulder", "right_elbow"],
+            "ideal_min": 0,
+            "ideal_max": 30
+        },
+        "back": {
+            "points": ["left_shoulder", "left_hip"],
+            "vertical_threshold": 45
+        }
+    },
+    "rep_detection": {
+        "state_machine": "descending_ascending",
+        "direction": "increase",
+        "angle_points": ["left_shoulder", "left_elbow", "left_wrist"],
+        "angle_points_secondary": ["right_shoulder", "right_elbow", "right_wrist"],
+        "stand_min": 160,
+        "descent_start": 130,
+        "bottom_target": 100,
+        "peak_hold_frames": 3,
+        "min_rep_frames": 20
+    },
+    "scoring": {
+        "base_score": 100,
+        "faults": {
+            "incomplete_lockout": {
+                "deduction": 20,
+                "threshold_deg": 155,
+                "clear_margin_deg": 5,
+                "direction": "below",
+                "active_during": ["PEAK"],
+                "description": "Not fully locked out - extend arms"
+            },
+            "arching_back": {
+                "deduction": 25,
+                "threshold_deg": 20,
+                "clear_margin_deg": 5,
+                "active_during": ["ACTIVE", "PEAK", "RETURN"],
+                "description": "Arching back - keep core tight"
+            },
+            "elbow_flare": {
+                "deduction": 15,
+                "threshold_deg": 45,
+                "clear_margin_deg": 5,
+                "active_during": ["ACTIVE", "PEAK"],
+                "description": "Elbows flaring - tuck them in"
+            }
+        }
+    }
+}

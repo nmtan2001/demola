@@ -14,23 +14,27 @@
         "elbow": {
             "points": ["left_shoulder", "left_elbow", "left_wrist"],
             "points_secondary": ["right_shoulder", "right_elbow", "right_wrist"],
+            "use_2d_only": true,
             "ideal_min": 30,
             "ideal_max": 45
         },
         "shoulder": {
             "points": ["left_hip", "left_shoulder", "left_elbow"],
             "points_secondary": ["right_hip", "right_shoulder", "right_elbow"],
+            "use_2d_only": true,
             "ideal_min": 0,
             "ideal_max": 30
         }
     },
     "rep_detection": {
         "state_machine": "contracting_extending",
-        "extended_threshold": 160,
-        "contracted_threshold": 45,
+        "use_2d_only": true,
+        "extended_threshold": 145,
+        "contracted_threshold": 65,
         "transition_buffer": 10,
         "hold_frames": 3,
-        "standing_stability_frames": 5
+        "standing_stability_frames": 5,
+        "min_rep_frames": 10
     },
     "scoring": {
         "base_score": 100,
@@ -39,12 +43,14 @@
                 "deduction": 25,
                 "threshold_deg": 35,
                 "clear_margin_deg": 5,
+                "active_during": ["ACTIVE", "PEAK"],
                 "description": "Elbow swinging - keep elbow tucked"
             },
             "insufficient_contraction": {
                 "deduction": 20,
-                "threshold_deg": 60,
+                "threshold_deg": 70,
                 "clear_margin_deg": 5,
+                "active_during": ["PEAK"],
                 "description": "Not curling all the way up - full range of motion"
             }
         }

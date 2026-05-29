@@ -125,6 +125,25 @@ const exerciseMetrics = {
     {key:'hip_angle', label:'Hip Angle'},
     {key:'back_angle', label:'Back Angle'},
     null, null
+  ],
+  pushup: [
+    {key:'elbow_angle', label:'Elbow Angle'},
+    {key:'hip_angle', label:'Hip Angle'},
+    {key:'back_angle', label:'Back Angle'},
+    null, null
+  ],
+  overhead_press: [
+    {key:'elbow_angle', label:'Elbow Angle'},
+    {key:'shoulder_angle', label:'Shoulder Angle'},
+    {key:'back_angle', label:'Back Angle'},
+    null, null
+  ],
+  lunge: [
+    {key:'knee_angle', label:'Knee Angle'},
+    {key:'hip_angle', label:'Hip Angle'},
+    {key:'back_angle', label:'Back Angle'},
+    {key:'asymmetry', label:'Symmetry'},
+    null
   ]
 };
 
@@ -144,11 +163,15 @@ function setMetrics(exId){
 }
 
 fetch('/api/exercises').then(r=>r.json()).then(data=>{
-  data.forEach(e=>{
+  data.exercises.forEach(e=>{
     const opt=document.createElement('option');
     opt.value=e.id; opt.textContent=e.name;
     exerciseEl.appendChild(opt);
   });
+  if(data.default_exercise){
+    exerciseEl.value=data.default_exercise;
+    setMetrics(data.default_exercise);
+  }
 });
 exerciseEl.addEventListener('change',()=>{
   setMetrics(exerciseEl.value);
@@ -240,93 +263,144 @@ class FormPuckServer:
             "faults": [],
         }
         self._lock = threading.Lock()
+        self._running = False
+        self._latest_jpeg = None
+        self._camera_connected = True
+        self._hip_velocity_history = []
+        self._prev_hip_y = None
 
-    def _process_frame(self):
-        """Process a single frame. Returns annotated JPEG bytes."""
-        success, frame = self._camera.read()
-        if not success or frame is None:
-            return None
+    def _producer_loop(self):
+        """Dedicated background thread to capture and process frames thread-safely."""
+        fps = self._config.get("target_fps", 30)
+        delay = 1.0 / fps if fps > 0 else 0.033
+        consecutive_failures = 0
 
-        pose_result = self._pose_extractor.process(frame)
-        landmarks = pose_result["landmarks"] if pose_result else None
-        world_landmarks = pose_result["world_landmarks"] if pose_result else None
+        while self._running:
+            success, frame = self._camera.read()
+            if not success or frame is None:
+                consecutive_failures += 1
+                if consecutive_failures > 50:
+                    with self._lock:
+                        self._camera_connected = False
+                        self._state["state"] = "CAMERA_DISCONNECTED"
+                    time.sleep(1.0)
+                else:
+                    time.sleep(delay)
+                continue
 
-        result = self._analyzer.analyze(landmarks, world_landmarks, [])
-        rep_info = result["rep_info"]
-        form_eval = result["form_eval"]
+            consecutive_failures = 0
+            with self._lock:
+                self._camera_connected = True
 
-        # Debug: print to console every frame
-        angles = form_eval.get("angles", {})
-        print(f"pose={pose_result is not None} "
-              f"state={rep_info['state'].value} "
-              f"reps={rep_info['rep_count']} "
-              f"knee={angles.get('knee_angle', '-')} "
-              f"elbow={angles.get('elbow_angle', '-')} "
-              f"faults={len(form_eval.get('faults', []))}", flush=True)
+            pose_result = self._pose_extractor.process(frame)
+            landmarks = pose_result["landmarks"] if pose_result else None
+            world_landmarks = pose_result["world_landmarks"] if pose_result else None
 
-        landmark_map = self._analyzer._landmark_map if landmarks is not None else {}
-        self._renderer.set_fault_joints(form_eval.get("faults", []), landmark_map)
+            # Calculate hip vertical velocity
+            current_velocity = 0.0
+            if world_landmarks is not None and len(world_landmarks) > 24:
+                left_hip_y = world_landmarks[23][1]
+                right_hip_y = world_landmarks[24][1]
+                hip_y = (left_hip_y + right_hip_y) / 2.0
 
-        if pose_result:
-            self._pose_extractor.draw_landmarks(frame, pose_result)
-            self._renderer.draw_fault_markers(frame, landmarks, form_eval.get("faults", []), landmark_map)
-            self._renderer.draw_angle_annotations(
-                frame, landmarks, form_eval.get("angles", {}), landmark_map
-            )
+                if self._prev_hip_y is not None:
+                    current_velocity = (hip_y - self._prev_hip_y) / delay
+                self._prev_hip_y = hip_y
+            else:
+                self._prev_hip_y = None
 
-        # Audio feedback
-        if form_eval.get("is_good", True):
-            self._prev_form_good = True
-        else:
-            if self._prev_form_good:
-                self._audio.play_fault()
-            self._prev_form_good = False
-            # Voice coach: speak the first (most important) fault
-            faults = form_eval.get("faults", [])
-            if faults:
-                self._audio.speak_fault(faults[0]["name"])
+            if world_landmarks is not None:
+                self._hip_velocity_history.append(current_velocity)
+                if len(self._hip_velocity_history) > 5:
+                    self._hip_velocity_history.pop(0)
+            else:
+                self._hip_velocity_history = []
 
-        # Rep completion
-        if rep_info["rep_completed"]:
-            self._audio.play_rep_complete()
-            if self._logger:
-                self._logger.log_rep(
-                    rep_info["rep_count"],
-                    form_eval.get("score", 0),
-                    form_eval.get("faults", []),
-                    form_eval.get("angles", {}),
+            with self._lock:
+                analyzer = self._analyzer
+
+            result = analyzer.analyze(landmarks, world_landmarks, self._hip_velocity_history)
+            rep_info = result["rep_info"]
+            form_eval = result["form_eval"]
+
+            landmark_map = analyzer._landmark_map if landmarks is not None else {}
+            self._renderer.set_fault_joints(form_eval.get("faults", []), landmark_map)
+
+            is_good = form_eval.get("is_good", True)
+            if pose_result:
+                self._pose_extractor.draw_landmarks(frame, pose_result, is_good)
+                self._renderer.draw_fault_markers(frame, landmarks, form_eval.get("faults", []), landmark_map)
+                self._renderer.draw_angle_annotations(
+                    frame, landmarks, form_eval.get("angles", {}), landmark_map
                 )
 
-        # Update shared state
-        with self._lock:
-            self._state = {
-                "rep_count": rep_info["rep_count"],
-                "state": rep_info["state"].value,
-                "score": form_eval.get("score", 100),
-                "is_good": form_eval.get("is_good", True),
-                "angles": {
-                    k: round(v, 1) if isinstance(v, (int, float)) else None
-                    for k, v in form_eval.get("angles", {}).items()
-                },
-                "faults": [
-                    {"name": f["name"], "description": f["description"]}
-                    for f in form_eval.get("faults", [])
-                ],
-                "summary": self._last_summary,
-            }
+            # Audio feedback
+            if form_eval.get("is_good", True):
+                self._prev_form_good = True
+            else:
+                if self._prev_form_good:
+                    self._audio.play_fault()
+                self._prev_form_good = False
+                faults = form_eval.get("faults", [])
+                if faults:
+                    self._audio.speak_fault(faults[0]["name"])
 
-        # Mirror the frame for display (natural mirror view)
-        display_frame = cv2.flip(frame, 1)
+            # Rep completion
+            if rep_info["rep_completed"]:
+                score = form_eval.get("score", 0)
+                fault_descs = [f["description"] for f in form_eval.get("faults", [])]
+                print(f"Rep {rep_info['rep_count']} | Score: {score} | Faults: {', '.join(fault_descs) if fault_descs else 'None'}", flush=True)
+                self._audio.play_rep_complete()
+                with self._lock:
+                    if self._logger:
+                        self._logger.log_rep(
+                            rep_info["rep_count"],
+                            form_eval.get("score", 0),
+                            form_eval.get("faults", []),
+                            form_eval.get("angles", {}),
+                        )
 
-        # Encode as JPEG
-        _, jpeg = cv2.imencode(".jpg", display_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
-        return jpeg.tobytes()
+            # Mirror the frame for display (natural mirror view)
+            display_frame = cv2.flip(frame, 1)
+
+            # Encode as JPEG
+            _, jpeg = cv2.imencode(".jpg", display_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            jpeg_bytes = jpeg.tobytes() if jpeg is not None else None
+
+            # Update shared state
+            with self._lock:
+                self._latest_jpeg = jpeg_bytes
+                self._state = {
+                    "rep_count": rep_info["rep_count"],
+                    "state": rep_info["state"].value,
+                    "score": form_eval.get("score", 100),
+                    "is_good": form_eval.get("is_good", True),
+                    "angles": {
+                        k: round(v, 1) if isinstance(v, (int, float)) else None
+                        for k, v in form_eval.get("angles", {}).items()
+                    },
+                    "faults": [
+                        {"name": f["name"], "description": f["description"]}
+                        for f in form_eval.get("faults", [])
+                    ],
+                    "summary": self._last_summary,
+                }
+
 
     def _generate_frames(self):
         """Generator for MJPEG stream."""
+        last_frame = None
         while True:
-            jpeg = self._process_frame()
-            if jpeg:
+            with self._lock:
+                jpeg = self._latest_jpeg
+                connected = self._camera_connected
+
+            if not connected:
+                time.sleep(0.5)
+                continue
+
+            if jpeg and jpeg != last_frame:
+                last_frame = jpeg
                 yield (
                     b"--frame\r\n"
                     b"Content-Type: image/jpeg\r\n\r\n" + jpeg + b"\r\n"
@@ -358,34 +432,52 @@ class FormPuckServer:
 
         @app.route("/api/exercises")
         def api_exercises():
-            return jsonify(self._available_exercises)
+            return jsonify({
+                "exercises": self._available_exercises,
+                "default_exercise": self._config.get("default_exercise", "squat"),
+            })
 
         @app.route("/api/exercise", methods=["POST"])
         def api_set_exercise():
             data = request.get_json()
             ex_id = data.get("id", "squat")
-            self._analyzer = ExerciseAnalyzer(ex_id)
-            self._analyzer.reset()
+            with self._lock:
+                self._analyzer = ExerciseAnalyzer(ex_id)
+                self._analyzer.reset()
+                self._hip_velocity_history = []
+                self._prev_hip_y = None
             return jsonify({"ok": True})
 
         @app.route("/api/session/toggle", methods=["POST"])
         def api_toggle_session():
-            if not self._session_active:
-                self._session_active = True
-                self._logger = SessionLogger(self._analyzer.name)
+            with self._lock:
+                active = self._session_active
+                analyzer_name = self._analyzer.name
+
+            if not active:
+                logger = SessionLogger(analyzer_name)
+                with self._lock:
+                    self._session_active = True
+                    self._logger = logger
                 return jsonify({"active": True})
             else:
                 report = {}
-                if self._logger:
-                    report = self._logger.generate_report()
-                    self._last_summary = self._logger.get_summary_text()
+                with self._lock:
+                    logger = self._logger
                     self._logger = None
-                self._session_active = False
+                    self._session_active = False
+
+                if logger:
+                    report = logger.generate_report()
+                    with self._lock:
+                        self._last_summary = logger.get_summary_text()
+
                 return jsonify({"active": False, "report": report})
 
         @app.route("/api/session/reset", methods=["POST"])
         def api_reset_session():
-            self._analyzer.reset()
+            with self._lock:
+                self._analyzer.reset()
             with self._lock:
                 self._state = {
                     "rep_count": 0,
@@ -401,13 +493,20 @@ class FormPuckServer:
         return app
 
     def run(self, host="0.0.0.0", port=5000, debug=False):
+        self._running = True
+        self._producer_thread = threading.Thread(target=self._producer_loop, daemon=True)
+        self._producer_thread.start()
+
         flask_app = self.create_app()
         print(f"Form Puck running at http://localhost:{port}")
         print("Open this URL in your browser.")
         print("Press Ctrl+C to stop.")
-        flask_app.run(host=host, port=port, debug=debug, threaded=True)
+        flask_app.run(host=host, port=port, debug=debug, use_reloader=False, threaded=True)
 
     def cleanup(self):
+        self._running = False
+        if hasattr(self, "_producer_thread"):
+            self._producer_thread.join(timeout=2.0)
         self._pose_extractor.release()
         self._audio.release()
         self._camera.release()

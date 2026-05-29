@@ -11,6 +11,7 @@ class WebcamCamera(BaseCamera):
             self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
             self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
             self._cap.set(cv2.CAP_PROP_FPS, fps)
+            self._cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
     def read(self):
         if not self._cap.isOpened():

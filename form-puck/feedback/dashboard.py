@@ -168,9 +168,10 @@ fetch('/api/exercises').then(r=>r.json()).then(data=>{
     opt.value=e.id; opt.textContent=e.name;
     exerciseEl.appendChild(opt);
   });
-  if(data.default_exercise){
-    exerciseEl.value=data.default_exercise;
-    setMetrics(data.default_exercise);
+  const active=data.current_exercise||data.default_exercise;
+  if(active){
+    exerciseEl.value=active;
+    setMetrics(active);
   }
 });
 exerciseEl.addEventListener('change',()=>{
@@ -193,8 +194,8 @@ function showReport(r){
     '<p>Exercise: '+r.exercise+'</p>'+
     '<p>Total Reps: '+r.total_reps+'</p>'+
     '<p>Average Score: '+r.average_score+'%</p>'+
-    '<p>Best Rep: '+(r.best_rep||'N/A')+'</p>'+
-    '<p>Worst Rep: '+(r.worst_rep||'N/A')+'</p>'+
+    '<p>Best Rep: '+(r.best_rep!=null?r.best_rep:'N/A')+'</p>'+
+    '<p>Worst Rep: '+(r.worst_rep!=null?r.worst_rep:'N/A')+'</p>'+
     (r.most_common_fault?'<p>Most Common Fault: '+r.most_common_fault+'</p>':'');
   document.getElementById('report-overlay').style.display='flex';
 }
@@ -244,7 +245,11 @@ class FormPuckServer:
             self._config.get("exercises_dir", "config/exercises")
         )
         default_ex = self._config.get("default_exercise", "squat")
-        self._analyzer = ExerciseAnalyzer(default_ex)
+        self._analyzer = ExerciseAnalyzer(
+            default_ex,
+            self._config.get("exercises_dir", "config/exercises"),
+            fps=self._config.get("target_fps", 30),
+        )
         self._renderer = SkeletonRenderer()
         self._audio = AudioFeedback()
         self._logger = None
@@ -268,6 +273,7 @@ class FormPuckServer:
         self._camera_connected = True
         self._hip_velocity_history = []
         self._prev_hip_y = None
+        self._prev_frame_time = None
 
     def _producer_loop(self):
         """Dedicated background thread to capture and process frames thread-safely."""
@@ -276,6 +282,7 @@ class FormPuckServer:
         consecutive_failures = 0
 
         while self._running:
+            frame_start = time.monotonic()
             success, frame = self._camera.read()
             if not success or frame is None:
                 consecutive_failures += 1
@@ -296,18 +303,22 @@ class FormPuckServer:
             landmarks = pose_result["landmarks"] if pose_result else None
             world_landmarks = pose_result["world_landmarks"] if pose_result else None
 
-            # Calculate hip vertical velocity
+            # Calculate hip vertical velocity using actual inter-frame elapsed time
             current_velocity = 0.0
             if world_landmarks is not None and len(world_landmarks) > 24:
                 left_hip_y = world_landmarks[23][1]
                 right_hip_y = world_landmarks[24][1]
                 hip_y = (left_hip_y + right_hip_y) / 2.0
 
-                if self._prev_hip_y is not None:
-                    current_velocity = (hip_y - self._prev_hip_y) / delay
+                if self._prev_hip_y is not None and self._prev_frame_time is not None:
+                    frame_dt = frame_start - self._prev_frame_time
+                    if frame_dt > 1e-6:
+                        current_velocity = (hip_y - self._prev_hip_y) / frame_dt
                 self._prev_hip_y = hip_y
+                self._prev_frame_time = frame_start
             else:
                 self._prev_hip_y = None
+                self._prev_frame_time = None
 
             if world_landmarks is not None:
                 self._hip_velocity_history.append(current_velocity)
@@ -318,13 +329,17 @@ class FormPuckServer:
 
             with self._lock:
                 analyzer = self._analyzer
-
-            result = analyzer.analyze(landmarks, world_landmarks, self._hip_velocity_history)
+                was_in_rep = analyzer.state.value in ("ACTIVE", "PEAK", "RETURN")
+                result = analyzer.analyze(landmarks, world_landmarks, self._hip_velocity_history)
             rep_info = result["rep_info"]
             form_eval = result["form_eval"]
 
+            # Clear velocity history when a new rep starts so bounce detection only
+            # sees velocities from within the current rep.
+            if not was_in_rep and rep_info.get("in_rep"):
+                self._hip_velocity_history = []
+
             landmark_map = analyzer._landmark_map if landmarks is not None else {}
-            self._renderer.set_fault_joints(form_eval.get("faults", []), landmark_map)
 
             is_good = form_eval.get("is_good", True)
             if pose_result:
@@ -386,6 +401,12 @@ class FormPuckServer:
                     "summary": self._last_summary,
                 }
 
+            # Throttle to target_fps; sleep for the remainder of the frame budget
+            elapsed = time.monotonic() - frame_start
+            sleep_time = delay - elapsed
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+
 
     def _generate_frames(self):
         """Generator for MJPEG stream."""
@@ -432,20 +453,36 @@ class FormPuckServer:
 
         @app.route("/api/exercises")
         def api_exercises():
+            with self._lock:
+                current_ex = self._analyzer.exercise_id
             return jsonify({
                 "exercises": self._available_exercises,
                 "default_exercise": self._config.get("default_exercise", "squat"),
+                "current_exercise": current_ex,
             })
 
         @app.route("/api/exercise", methods=["POST"])
         def api_set_exercise():
-            data = request.get_json()
+            data = request.get_json() or {}
             ex_id = data.get("id", "squat")
+            exercises_dir = self._config.get("exercises_dir", "config/exercises")
+
+            # Reject unknown IDs before touching any server state
+            valid_ids = {e["id"] for e in self._available_exercises}
+            if ex_id not in valid_ids:
+                return jsonify({"ok": False, "error": f"Unknown exercise: {ex_id}"}), 400
+
             with self._lock:
-                self._analyzer = ExerciseAnalyzer(ex_id)
+                if self._session_active:
+                    return jsonify({"ok": False, "error": "Cannot change exercise during active session"}), 400
+                self._analyzer = ExerciseAnalyzer(
+                    ex_id, exercises_dir,
+                    fps=self._config.get("target_fps", 30),
+                )
                 self._analyzer.reset()
                 self._hip_velocity_history = []
                 self._prev_hip_y = None
+                self._prev_frame_time = None
             return jsonify({"ok": True})
 
         @app.route("/api/session/toggle", methods=["POST"])
@@ -455,9 +492,17 @@ class FormPuckServer:
                 analyzer_name = self._analyzer.name
 
             if not active:
+                with self._lock:
+                    self._analyzer.reset()
+                    self._hip_velocity_history = []
+                    self._prev_hip_y = None
+                    self._prev_frame_time = None
+                    self._prev_form_good = True
+                    # Set session_active immediately so api_set_exercise is blocked
+                    # for the entire start flow, not just after logger construction.
+                    self._session_active = True
                 logger = SessionLogger(analyzer_name)
                 with self._lock:
-                    self._session_active = True
                     self._logger = logger
                 return jsonify({"active": True})
             else:
@@ -478,7 +523,12 @@ class FormPuckServer:
         def api_reset_session():
             with self._lock:
                 self._analyzer.reset()
-            with self._lock:
+                self._session_active = False
+                self._logger = None
+                self._hip_velocity_history = []
+                self._prev_hip_y = None
+                self._prev_frame_time = None
+                self._prev_form_good = True
                 self._state = {
                     "rep_count": 0,
                     "state": "STANDING",

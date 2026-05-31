@@ -47,8 +47,8 @@
         "faults": {
             "sagging_hips": {
                 "deduction": 20,
-                "threshold_deg": 20,
-                "clear_margin_deg": 5,
+                "threshold_cm": 4,
+                "clear_margin_cm": 2,
                 "active_during": ["ACTIVE", "PEAK"],
                 "description": "Hips sagging - keep body straight"
             },
@@ -56,7 +56,7 @@
                 "deduction": 20,
                 "threshold_deg": 100,
                 "clear_margin_deg": 5,
-                "active_during": ["ACTIVE"],
+                "active_during": ["ACTIVE", "PEAK"],
                 "description": "Half rep - go lower"
             },
             "asymmetric_descent": {

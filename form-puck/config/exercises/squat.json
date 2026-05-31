@@ -53,7 +53,7 @@
                 "deduction": 15,
                 "threshold_deg": 110,
                 "clear_margin_deg": 5,
-                "active_during": ["ACTIVE"],
+                "active_during": ["ACTIVE", "PEAK"],
                 "description": "Insufficient depth - go deeper"
             },
             "knee_cave": {
@@ -72,8 +72,8 @@
             },
             "bounce_at_bottom": {
                 "deduction": 10,
-                "velocity_threshold": 0.05,
-                "active_during": ["PEAK"],
+                "velocity_threshold": 0.3,
+                "active_during": ["ACTIVE", "PEAK"],
                 "description": "Bouncing at bottom - control the movement"
             }
         }

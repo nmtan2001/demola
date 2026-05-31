@@ -87,8 +87,12 @@ class AngleCalculator:
             Lateral deviation angle in degrees. 0 = perfect alignment.
         """
         foot_center_x = (ankle[0] + foot_index[0]) / 2.0
-        # Inward cave occurs when knee is closer to the body midline (x=0) than the foot center
-        lateral_deviation = max(0.0, abs(foot_center_x) - abs(knee[0]))
+        # Inward cave: knee is closer to the body midline than the foot-ankle centre.
+        # np.sign(foot_center_x) flips the comparison direction per side so the
+        # formula is correct for both the left leg (negative X) and the right leg
+        # (positive X) without assuming the subject is centred at X=0.
+        sign = np.sign(foot_center_x) if abs(foot_center_x) > 1e-6 else 1.0
+        lateral_deviation = max(0.0, sign * (foot_center_x - knee[0]))
         vertical_dist = abs(knee[1] - ankle[1])
         if vertical_dist < 1e-6:
             return 0.0

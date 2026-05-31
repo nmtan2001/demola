@@ -43,9 +43,10 @@
         "faults": {
             "knee_over_toe": {
                 "deduction": 20,
-                "threshold_deg": 80,
-                "clear_margin_deg": 5,
-                "direction": "below",
+                "threshold_cm": 0,
+                "clear_margin_cm": 3,
+                "direction": "above",
+                "knee_angle_mode": "max",
                 "active_during": ["PEAK"],
                 "description": "Knee too far forward"
             },
@@ -53,7 +54,8 @@
                 "deduction": 15,
                 "threshold_deg": 110,
                 "clear_margin_deg": 5,
-                "active_during": ["ACTIVE"],
+                "knee_angle_mode": "max",
+                "active_during": ["ACTIVE", "PEAK"],
                 "description": "Not deep enough - lower your hips"
             },
             "back_rounding": {

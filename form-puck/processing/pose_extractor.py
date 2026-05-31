@@ -1,4 +1,5 @@
 import os
+import time
 import cv2
 import numpy as np
 import mediapipe as mp
@@ -43,6 +44,7 @@ class PoseExtractor:
             output_segmentation_masks=False,
         )
         self._landmarker = PoseLandmarker.create_from_options(options)
+        self._start_ms = int(time.monotonic() * 1000)
         self._timestamp_ms = 0
 
     def process(self, frame):
@@ -57,7 +59,10 @@ class PoseExtractor:
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         mp_image = Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
 
-        self._timestamp_ms += 33  # ~30 FPS increment
+        # Use real elapsed wall-clock time; guarantee strictly increasing timestamps
+        # as required by MediaPipe VIDEO mode.
+        now_ms = int(time.monotonic() * 1000) - self._start_ms
+        self._timestamp_ms = max(self._timestamp_ms + 1, now_ms)
         result = self._landmarker.detect_for_video(mp_image, self._timestamp_ms)
 
         if not result.pose_landmarks or len(result.pose_landmarks) == 0:

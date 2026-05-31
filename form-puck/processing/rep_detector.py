@@ -27,7 +27,7 @@ class SquatRepDetector:
     DEFAULT_PRIMARY = (23, 25, 27)
     DEFAULT_SECONDARY = (24, 26, 28)
 
-    def __init__(self, config, landmark_map=None):
+    def __init__(self, config, landmark_map=None, fps=30):
         self._state = RepState.STANDING
         self._rep_count = 0
         self._smoother = EMASmoother(alpha=0.3)
@@ -45,6 +45,8 @@ class SquatRepDetector:
         self._hold_target = config.get("peak_hold_frames", 3)
         self._hold_counter = 0
         self._min_rep_frames = config.get("min_rep_frames", 20)
+        timeout_seconds = config.get("rep_timeout_seconds", 5.0)
+        self._rep_timeout_frames = max(1, int(timeout_seconds * fps))
         self._rep_start_frame = 0
         self._frame_count = 0
 
@@ -78,6 +80,13 @@ class SquatRepDetector:
     def update(self, landmarks, world_landmarks=None):
         self._frame_count += 1
         if landmarks is None:
+            # Advance timeout even when pose is missing so a dropped frame cannot
+            # keep a rep stuck in an active state indefinitely.
+            if self._in_rep and self._frame_count - self._rep_start_frame > self._rep_timeout_frames:
+                self._state = RepState.STANDING
+                self._in_rep = False
+                self._reached_depth = False
+                self._hold_counter = 0
             return self._make_result(False)
 
         angle = self._get_angle(landmarks, world_landmarks)
@@ -105,10 +114,15 @@ class SquatRepDetector:
                 self._rep_start_frame = self._frame_count
 
         elif self._state == RepState.DESCENDING:
-            if angle < self._bottom_target:
+            # Timeout is checked first so a user stuck at depth never hangs forever.
+            if self._frame_count - self._rep_start_frame > self._rep_timeout_frames:
+                self._state = RepState.STANDING
+                self._in_rep = False
+            elif angle < self._bottom_target:
                 self._hold_counter += 1
                 if self._hold_counter >= self._hold_target:
                     self._reached_depth = True
+                    self._hold_counter = 0  # reset; no longer needed in this state
                     self._state = RepState.BOTTOM
             elif angle > self._stand_min:
                 # Aborted - went back to standing without reaching bottom
@@ -117,17 +131,20 @@ class SquatRepDetector:
             else:
                 # In descent range but not at target - reset hold counter
                 self._hold_counter = 0
-                if self._frame_count - self._rep_start_frame > 150:
-                    # Timeout after 5 seconds in descent
-                    self._state = RepState.STANDING
-                    self._in_rep = False
 
         elif self._state == RepState.BOTTOM:
-            if angle > self._bottom_target + 10:
+            if self._frame_count - self._rep_start_frame > self._rep_timeout_frames:
+                self._state = RepState.STANDING
+                self._in_rep = False
+            elif angle > self._bottom_target + 10:
                 self._state = RepState.ASCENDING
 
         elif self._state == RepState.ASCENDING:
-            if angle > self._stand_min:
+            if self._frame_count - self._rep_start_frame > self._rep_timeout_frames:
+                self._state = RepState.STANDING
+                self._in_rep = False
+                self._reached_depth = False
+            elif angle > self._stand_min:
                 duration = self._frame_count - self._rep_start_frame
                 if self._reached_depth and duration >= self._min_rep_frames:
                     self._rep_count += 1
@@ -160,28 +177,39 @@ class SquatRepDetector:
                 self._rep_start_frame = self._frame_count
 
         elif self._state == RepState.DESCENDING:
-            if angle > self._stand_min:
+            # Timeout checked first so a user stuck at full lockout never hangs.
+            if self._frame_count - self._rep_start_frame > self._rep_timeout_frames:
+                self._state = RepState.STANDING
+                self._in_rep = False
+            elif angle > self._stand_min:
                 self._hold_counter += 1
                 if self._hold_counter >= self._hold_target:
                     self._reached_depth = True
+                    self._hold_counter = 0
                     self._state = RepState.BOTTOM
-            elif angle < self._bottom_target:
-                # Never reached peak, aborted
+            elif angle < self._descent_start:
+                # Angle dropped back below the initiation threshold — user gave up
+                # before reaching the peak (stand_min).  Abort the rep.
                 self._state = RepState.STANDING
                 self._in_rep = False
             else:
                 # In active range but not at peak - reset hold counter
                 self._hold_counter = 0
-                if self._frame_count - self._rep_start_frame > 150:
-                    self._state = RepState.STANDING
-                    self._in_rep = False
 
         elif self._state == RepState.BOTTOM:
-            if angle < self._stand_min - 10:
+            if self._frame_count - self._rep_start_frame > self._rep_timeout_frames:
+                self._state = RepState.STANDING
+                self._in_rep = False
+            elif angle < self._stand_min - 10:
                 self._state = RepState.ASCENDING
 
         elif self._state == RepState.ASCENDING:
-            if angle < self._descent_start:
+            if self._frame_count - self._rep_start_frame > self._rep_timeout_frames:
+                self._state = RepState.STANDING
+                self._in_rep = False
+                self._reached_depth = False
+            elif angle < self._bottom_target:
+                # Returned to rest position — rep counts
                 duration = self._frame_count - self._rep_start_frame
                 if self._reached_depth and duration >= self._min_rep_frames:
                     self._rep_count += 1
@@ -229,6 +257,8 @@ class SquatRepDetector:
         self._in_rep = False
         self._reached_depth = False
         self._hold_counter = 0
+        self._frame_count = 0
+        self._rep_start_frame = 0
         self._smoother.reset()
 
 
@@ -239,7 +269,7 @@ class CurlRepDetector:
     Includes minimum rep duration and rollback conditions.
     """
 
-    def __init__(self, config, landmark_map):
+    def __init__(self, config, landmark_map, fps=30):
         self._state = RepState.EXTENDED
         self._rep_count = 0
         self._landmark_map = landmark_map
@@ -252,10 +282,13 @@ class CurlRepDetector:
         self._use_2d_only = config.get("use_2d_only", False)
         self._hold_counter = 0
         self._stability_frames = config.get("standing_stability_frames", 5)
-        self._stability_counter = 0
+        # Start at threshold so the very first rep is not artificially delayed
+        self._stability_counter = self._stability_frames
         self._in_rep = False
         self._reached_target = False
         self._min_rep_frames = config.get("min_rep_frames", 18)
+        timeout_seconds = config.get("rep_timeout_seconds", 5.0)
+        self._rep_timeout_frames = max(1, int(timeout_seconds * fps))
         self._rep_start_frame = 0
         self._frame_count = 0
 
@@ -274,6 +307,12 @@ class CurlRepDetector:
     def update(self, landmarks, world_landmarks=None):
         self._frame_count += 1
         if landmarks is None:
+            # Advance timeout even when pose is missing so a dropped frame cannot
+            # keep a rep stuck in an active state indefinitely.
+            if self._in_rep and self._frame_count - self._rep_start_frame > self._rep_timeout_frames:
+                self._state = RepState.EXTENDED
+                self._in_rep = False
+                self._stability_counter = 0
             return self._make_result(False)
 
         elbow_angle = self._get_elbow_angle(landmarks, world_landmarks)
@@ -284,14 +323,19 @@ class CurlRepDetector:
         rep_completed = False
 
         if self._state == RepState.EXTENDED:
-            if elbow_angle < self._extended_threshold - self._transition_buffer:
+            self._stability_counter += 1
+            if self._stability_counter >= self._stability_frames and elbow_angle < self._extended_threshold - self._transition_buffer:
                 self._state = RepState.CONTRACTING
                 self._in_rep = True
                 self._reached_target = False
                 self._rep_start_frame = self._frame_count
 
         elif self._state == RepState.CONTRACTING:
-            if elbow_angle < self._contracted_threshold:
+            if self._frame_count - self._rep_start_frame > self._rep_timeout_frames:
+                self._state = RepState.EXTENDED
+                self._in_rep = False
+                self._stability_counter = 0
+            elif elbow_angle < self._contracted_threshold:
                 self._reached_target = True
                 self._state = RepState.CONTRACTED
                 self._hold_counter = 0
@@ -301,19 +345,29 @@ class CurlRepDetector:
                 self._in_rep = False
 
         elif self._state == RepState.CONTRACTED:
-            self._hold_counter += 1
-            if elbow_angle > self._contracted_threshold + self._transition_buffer:
-                self._state = RepState.EXTENDING
+            if self._frame_count - self._rep_start_frame > self._rep_timeout_frames:
+                self._state = RepState.EXTENDED
+                self._in_rep = False
                 self._stability_counter = 0
+            else:
+                self._hold_counter += 1
+                if self._hold_counter >= self._hold_frames and elbow_angle > self._contracted_threshold + self._transition_buffer:
+                    self._state = RepState.EXTENDING
+                    self._stability_counter = 0
 
         elif self._state == RepState.EXTENDING:
-            if elbow_angle > self._extended_threshold:
+            if self._frame_count - self._rep_start_frame > self._rep_timeout_frames:
+                self._state = RepState.EXTENDED
+                self._in_rep = False
+                self._stability_counter = 0
+            elif elbow_angle > self._extended_threshold:
                 duration = self._frame_count - self._rep_start_frame
                 if self._reached_target and duration >= self._min_rep_frames:
                     self._rep_count += 1
                     rep_completed = True
                 self._state = RepState.EXTENDED
                 self._in_rep = False
+                self._stability_counter = 0  # Require stability hold before next rep
             elif elbow_angle < self._contracted_threshold:
                 # Dropped back to fully contracted
                 self._state = RepState.CONTRACTED
@@ -370,15 +424,17 @@ class CurlRepDetector:
         self._state = RepState.EXTENDED
         self._rep_count = 0
         self._hold_counter = 0
-        self._stability_counter = 0
+        self._stability_counter = self._stability_frames  # Ready for first rep immediately
         self._in_rep = False
         self._reached_target = False
+        self._frame_count = 0
+        self._rep_start_frame = 0
         self._smoother.reset()
 
 
-def create_rep_detector(config, landmark_map=None):
+def create_rep_detector(config, landmark_map=None, fps=30):
     """Factory: create the appropriate rep detector based on state_machine type."""
     sm_type = config.get("state_machine", "descending_ascending")
     if sm_type == "contracting_extending":
-        return CurlRepDetector(config, landmark_map or {})
-    return SquatRepDetector(config, landmark_map or {})
+        return CurlRepDetector(config, landmark_map or {}, fps=fps)
+    return SquatRepDetector(config, landmark_map or {}, fps=fps)

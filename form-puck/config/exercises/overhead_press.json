@@ -33,7 +33,7 @@
         "direction": "increase",
         "angle_points": ["left_shoulder", "left_elbow", "left_wrist"],
         "angle_points_secondary": ["right_shoulder", "right_elbow", "right_wrist"],
-        "stand_min": 160,
+        "stand_min": 150,
         "descent_start": 130,
         "bottom_target": 100,
         "peak_hold_frames": 3,

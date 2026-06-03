@@ -10,24 +10,22 @@ import DemoSkeleton from './components/DemoSkeleton';
 function App() {
   const { metrics, onPose, cycleExercise, activeExerciseName } = useExerciseAnalysis();
 
-  // Fault-to-LED-segment mapping: 5 LEDs = Head, Arms, Torso, Legs, Overall
-  const ARM_FAULTS = ['elbow_swing', 'elbow_flare', 'insufficient_contraction', 'incomplete_lockout', 'bar_path_deviation'];
-  const TORSO_FAULTS = ['back_rounding', 'arching_back', 'sagging_hips', 'piking_hips', 'hip_shoot'];
-  const LEG_FAULTS = ['insufficient_depth', 'half_rep', 'knee_cave', 'knee_over_toe', 'bounce_at_bottom', 'asymmetric_descent'];
+  // 5 LEDs: Head/Posture, Left Arm, Right Arm, Left Leg, Right Leg
+  // Side-specific arm faults use _left/_right suffix from FormScorer
+  const POSTURE_FAULTS = ['back_rounding', 'arching_back', 'sagging_hips', 'piking_hips', 'hip_shoot'];
+  const LEFT_ARM_FAULTS = ['elbow_swing_left', 'elbow_flare_left', 'insufficient_contraction_left', 'incomplete_lockout_left', 'bar_path_deviation', 'half_rep'];
+  const RIGHT_ARM_FAULTS = ['elbow_swing_right', 'elbow_flare_right', 'insufficient_contraction_right', 'incomplete_lockout_right', 'bar_path_deviation', 'half_rep'];
+  const LEFT_LEG_FAULTS = ['knee_cave_left', 'insufficient_depth', 'half_rep', 'knee_over_toe', 'bounce_at_bottom', 'asymmetric_descent'];
+  const RIGHT_LEG_FAULTS = ['knee_cave_right', 'insufficient_depth', 'half_rep', 'knee_over_toe', 'bounce_at_bottom', 'asymmetric_descent'];
 
   const isTracking = metrics.angles.shoulder !== '--' || metrics.angles.elbow !== '--' || metrics.angles.hip !== '--' || metrics.angles.knee !== '--';
 
-  const hasArmFault = metrics.faults.some(f => ARM_FAULTS.includes(f.name));
-  const hasTorsoFault = metrics.faults.some(f => TORSO_FAULTS.includes(f.name));
-  const hasLegFault = metrics.faults.some(f => LEG_FAULTS.includes(f.name));
-  const hasAnyFault = metrics.faults.length > 0;
-
   const ledStates = [
-    isTracking ? 'green' : 'off',                    // LED 1: Head
-    isTracking ? (hasArmFault ? 'red' : 'green') : 'off',    // LED 2: Arms
-    isTracking ? (hasTorsoFault ? 'red' : 'green') : 'off',  // LED 3: Torso
-    isTracking ? (hasLegFault ? 'red' : 'green') : 'off',    // LED 4: Legs
-    isTracking ? (hasAnyFault ? 'red' : 'green') : 'off',    // LED 5: Overall
+    isTracking ? (metrics.faults.some(f => POSTURE_FAULTS.includes(f.name)) ? 'red' : 'green') : 'off',       // LED 1: Head/Posture
+    isTracking ? (metrics.faults.some(f => LEFT_ARM_FAULTS.includes(f.name)) ? 'red' : 'green') : 'off',       // LED 2: Left Arm
+    isTracking ? (metrics.faults.some(f => RIGHT_ARM_FAULTS.includes(f.name)) ? 'red' : 'green') : 'off',      // LED 3: Right Arm
+    isTracking ? (metrics.faults.some(f => LEFT_LEG_FAULTS.includes(f.name)) ? 'red' : 'green') : 'off',       // LED 4: Left Leg
+    isTracking ? (metrics.faults.some(f => RIGHT_LEG_FAULTS.includes(f.name)) ? 'red' : 'green') : 'off',      // LED 5: Right Leg
   ];
 
   return (

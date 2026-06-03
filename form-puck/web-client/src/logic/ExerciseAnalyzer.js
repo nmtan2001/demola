@@ -429,6 +429,7 @@ export class FormScorer {
 
     this._worldLandmarks = worldLandmarks;
     const metrics = {};
+    const currentState = repState || RepState.STANDING;
 
     // Knee angle
     const kneePts = this._getAnglePoints(landmarks, "knee");
@@ -483,13 +484,21 @@ export class FormScorer {
       const shoulderPtsSec = this._getAnglePointsSecondary(landmarks, "shoulder");
       const shoulderAngleSec = shoulderPtsSec ? AngleCalculator.calculateAngle(...shoulderPtsSec) : shoulderAngle;
       metrics.shoulder_angle = this._smoother.smooth("shoulder_angle", (shoulderAngle + shoulderAngleSec) / 2.0);
+      metrics.shoulder_angle_left = this._smoother.smooth("shoulder_angle_left", shoulderAngle);
+      metrics.shoulder_angle_right = this._smoother.smooth("shoulder_angle_right", shoulderAngleSec);
     }
 
-    // Knee cave
+    // Knee cave (per-side)
     if (worldLandmarks) {
       const kneeCave = this._calculateKneeCave3d(worldLandmarks);
-      if (kneeCave !== null) {
-        metrics.knee_cave = this._smoother.smooth("knee_cave", kneeCave);
+      if (kneeCave.max !== null) {
+        metrics.knee_cave = this._smoother.smooth("knee_cave", kneeCave.max);
+      }
+      if (kneeCave.left !== null) {
+        metrics.knee_cave_left = this._smoother.smooth("knee_cave_left", kneeCave.left);
+      }
+      if (kneeCave.right !== null) {
+        metrics.knee_cave_right = this._smoother.smooth("knee_cave_right", kneeCave.right);
       }
     }
 
@@ -542,7 +551,6 @@ export class FormScorer {
 
     let score = this._scoringConfig.base_score || 100;
     const activeFaults = [];
-    const currentState = repState || RepState.STANDING;
 
     if ("hip_shoot" in this._faultsConfig && currentState === RepState.ACTIVE) {
       this._backAngleAtBottom = metrics.back_angle;
@@ -557,7 +565,7 @@ export class FormScorer {
 
       const currentlyActive = this._activeFaults.has(faultName);
       const { detected, value } = this._checkFault(faultName, faultCfg, metrics, hipVelocity || [], currentlyActive);
-      
+
       if (detected) {
         this._activeFaults.add(faultName);
         score -= (faultCfg.deduction || 0);
@@ -570,6 +578,95 @@ export class FormScorer {
         });
       } else {
         this._activeFaults.delete(faultName);
+      }
+    }
+
+    // Side-specific checks for arm faults (elbow_swing, elbow_flare, insufficient_contraction, incomplete_lockout)
+    const SIDE_ARM_FAULTS = ['elbow_swing', 'elbow_flare', 'insufficient_contraction', 'incomplete_lockout'];
+    const SIDE_LEG_FAULTS = ['knee_cave'];
+    const SIDES = ['left', 'right'];
+
+    for (const faultName of SIDE_ARM_FAULTS) {
+      if (!(faultName in this._faultsConfig)) continue;
+      const faultCfg = this._faultsConfig[faultName];
+      const activeDuring = faultCfg.active_during;
+      if (activeDuring && !activeDuring.includes(currentState)) {
+        for (const side of SIDES) {
+          this._activeFaults.delete(`${faultName}_${side}`);
+        }
+        continue;
+      }
+
+      for (const side of SIDES) {
+        const sideFaultName = `${faultName}_${side}`;
+        let sideValue;
+        if (faultName === 'elbow_swing' || faultName === 'elbow_flare') {
+          sideValue = side === 'left' ? metrics.shoulder_angle_left : metrics.shoulder_angle_right;
+        } else {
+          sideValue = side === 'left' ? metrics.elbow_angle_left : metrics.elbow_angle_right;
+        }
+        if (sideValue === undefined) continue;
+
+        const wasActive = this._activeFaults.has(sideFaultName);
+        const trigger = faultCfg.threshold_deg ?? faultCfg.threshold_cm ?? faultCfg.threshold_px;
+        const clearMargin = faultCfg.clear_margin_deg ?? faultCfg.clear_margin_cm ?? faultCfg.clear_margin_px ?? 5;
+        const direction = faultCfg.direction || "above";
+
+        if (FormScorer._checkThreshold(sideValue, trigger, clearMargin, direction, wasActive)) {
+          if (!this._activeFaults.has(sideFaultName)) {
+            score -= (faultCfg.deduction || 0);
+          }
+          this._activeFaults.add(sideFaultName);
+          activeFaults.push({
+            name: sideFaultName,
+            description: faultCfg.description,
+            value: sideValue,
+            deduction: faultCfg.deduction || 0,
+            direction: faultCfg.direction || "above"
+          });
+        } else {
+          this._activeFaults.delete(sideFaultName);
+        }
+      }
+    }
+
+    // Side-specific checks for knee cave
+    for (const faultName of SIDE_LEG_FAULTS) {
+      if (!(faultName in this._faultsConfig)) continue;
+      const faultCfg = this._faultsConfig[faultName];
+      const activeDuring = faultCfg.active_during;
+      if (activeDuring && !activeDuring.includes(currentState)) {
+        for (const side of SIDES) {
+          this._activeFaults.delete(`${faultName}_${side}`);
+        }
+        continue;
+      }
+
+      for (const side of SIDES) {
+        const sideFaultName = `${faultName}_${side}`;
+        const sideValue = side === 'left' ? metrics.knee_cave_left : metrics.knee_cave_right;
+        if (sideValue === undefined) continue;
+
+        const wasActive = this._activeFaults.has(sideFaultName);
+        const trigger = faultCfg.threshold_deg ?? faultCfg.threshold_cm ?? faultCfg.threshold_px;
+        const clearMargin = faultCfg.clear_margin_deg ?? faultCfg.clear_margin_cm ?? faultCfg.clear_margin_px ?? 5;
+        const direction = faultCfg.direction || "above";
+
+        if (FormScorer._checkThreshold(sideValue, trigger, clearMargin, direction, wasActive)) {
+          if (!this._activeFaults.has(sideFaultName)) {
+            score -= (faultCfg.deduction || 0);
+          }
+          this._activeFaults.add(sideFaultName);
+          activeFaults.push({
+            name: sideFaultName,
+            description: faultCfg.description,
+            value: sideValue,
+            deduction: faultCfg.deduction || 0,
+            direction: faultCfg.direction || "above"
+          });
+        } else {
+          this._activeFaults.delete(sideFaultName);
+        }
       }
     }
 
@@ -589,6 +686,14 @@ export class FormScorer {
 
   reset() {
     this.clearRep();
+  }
+
+  static _checkThreshold(value, trigger, clearMargin, direction, currentlyActive) {
+    if (value === null || value === undefined) return false;
+    if (direction === "below") {
+      return currentlyActive ? value < trigger + clearMargin : value <= trigger;
+    }
+    return currentlyActive ? value > trigger - clearMargin : value >= trigger;
   }
 
   _checkFault(faultName, faultCfg, metrics, hipVelocity, currentlyActive) {
@@ -644,11 +749,12 @@ export class FormScorer {
         value = metrics.back_angle - this._backAngleAtBottom;
       }
     } else if (faultName === "elbow_swing" || faultName === "elbow_flare") {
-      value = metrics.shoulder_angle;
+      // Use max of left/right so a single-side swing is caught, not diluted by averaging
+      value = Math.max(metrics.shoulder_angle_left || 0, metrics.shoulder_angle_right || 0) || metrics.shoulder_angle;
     } else if (faultName === "insufficient_contraction") {
-      value = metrics.elbow_angle;
+      value = Math.max(metrics.elbow_angle_left || 0, metrics.elbow_angle_right || 0) || metrics.elbow_angle;
     } else if (faultName === "incomplete_lockout") {
-      value = metrics.elbow_angle;
+      value = Math.max(metrics.elbow_angle_left || 0, metrics.elbow_angle_right || 0) || metrics.elbow_angle;
     } else if (faultName === "sagging_hips") {
       const sag = metrics.hip_sag;
       value = (sag !== undefined && sag > 0) ? sag : null;
@@ -695,23 +801,10 @@ export class FormScorer {
     const clearMargin = faultCfg.clear_margin_cm ?? faultCfg.clear_margin_px ?? faultCfg.clear_margin_deg ?? 5;
     const direction = faultCfg.direction || "above";
 
-    if (direction === "below") {
-      if (currentlyActive) {
-        if (value >= trigger + clearMargin) return { detected: false, value };
-        return { detected: true, value };
-      } else {
-        if (value <= trigger) return { detected: true, value };
-        return { detected: false, value: null };
-      }
-    } else {
-      if (currentlyActive) {
-        if (value <= trigger - clearMargin) return { detected: false, value };
-        return { detected: true, value };
-      } else {
-        if (value >= trigger) return { detected: true, value };
-        return { detected: false, value: null };
-      }
-    }
+    const detected = FormScorer._checkThreshold(value, trigger, clearMargin, direction, currentlyActive);
+    if (detected) return { detected: true, value };
+    if (currentlyActive) return { detected: false, value };
+    return { detected: false, value: null };
   }
 
   _getAnglePoints(landmarks, angleName) {
@@ -753,20 +846,25 @@ export class FormScorer {
     const lKnee = AngleCalculator.getLandmarkXyz(worldLandmarks, lm.left_knee ?? 25);
     const lAnkle = AngleCalculator.getLandmarkXyz(worldLandmarks, lm.left_ankle ?? 27);
     const lFoot = AngleCalculator.getLandmarkXyz(worldLandmarks, lm.left_foot_index ?? 31);
-    
+
     const rKnee = AngleCalculator.getLandmarkXyz(worldLandmarks, lm.right_knee ?? 26);
     const rAnkle = AngleCalculator.getLandmarkXyz(worldLandmarks, lm.right_ankle ?? 28);
     const rFoot = AngleCalculator.getLandmarkXyz(worldLandmarks, lm.right_foot_index ?? 32);
-    
-    const values = [];
+
+    let leftVal = null, rightVal = null;
     if (lKnee && lAnkle && lFoot) {
-      values.push(AngleCalculator.calculateKneeCave(lKnee, lAnkle, lFoot));
+      leftVal = AngleCalculator.calculateKneeCave(lKnee, lAnkle, lFoot);
     }
     if (rKnee && rAnkle && rFoot) {
-      values.push(AngleCalculator.calculateKneeCave(rKnee, rAnkle, rFoot));
+      rightVal = AngleCalculator.calculateKneeCave(rKnee, rAnkle, rFoot);
     }
-    
-    return values.length ? Math.max(...values) : null;
+
+    const values = [leftVal, rightVal].filter(v => v !== null);
+    return {
+      left: leftVal,
+      right: rightVal,
+      max: values.length ? Math.max(...values) : null
+    };
   }
 }
 

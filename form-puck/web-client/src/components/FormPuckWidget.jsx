@@ -1,4 +1,4 @@
-import React from 'react';
+
 import './FormPuckWidget.css';
 
 const FormPuckWidget = ({ onClick, ledStates = ['off', 'off', 'off', 'off', 'off'] }) => {

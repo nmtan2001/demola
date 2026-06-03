@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 
 // MediaPipe landmark indices used for skeleton drawing
 const CONNECTIONS = [

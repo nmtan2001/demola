@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import './App.css';
 import CameraViewport from './components/CameraViewport';
 import MetricsPanel from './components/MetricsPanel';
@@ -50,12 +50,6 @@ function App() {
 
         {/* Corner widgets */}
         <div className="corner-widgets">
-          <button 
-            onClick={() => setCurrentView('dashboard')}
-            style={{ marginBottom: '1rem', padding: '0.5rem 1rem', borderRadius: '8px', border: 'none', backgroundColor: '#3b82f6', color: 'white', cursor: 'pointer', pointerEvents: 'auto', fontWeight: 'bold' }}
-          >
-            📊 View Dashboard
-          </button>
           <div className="puck-widget-wrap">
             <FormPuckWidget onClick={cycleExercise} ledStates={ledStates} />
           </div>
@@ -70,6 +64,7 @@ function App() {
         isSessionActive={isSessionActive}
         onStartSession={startSession}
         onEndSession={endSession}
+        onViewDashboard={() => setCurrentView('dashboard')}
       />
     </>
   );

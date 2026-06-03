@@ -71,7 +71,7 @@ export class SquatRepDetector {
     }
 
     angle = this._smoother.smooth('primary', angle);
-    let repCompleted = false;
+    let repCompleted;
 
     if (this._direction === 'increase') {
       repCompleted = this._updateIncrease(angle);

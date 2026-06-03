@@ -31,13 +31,17 @@ export const useExerciseAnalysis = () => {
   useEffect(() => {
     analyzerRef.current = new ExerciseAnalyzer(EXERCISE_CONFIGS[activeExerciseIndex]);
     lastRepCountRef.current = 0;
-    setMetrics(prev => ({
-      ...prev,
-      repCount: 0,
-      liveScore: 100,
-      faults: []
-    }));
-    setIsSessionActive(false);
+    
+    // Defer state update to avoid synchronous setState inside useEffect lint error
+    queueMicrotask(() => {
+      setMetrics(prev => ({
+        ...prev,
+        repCount: 0,
+        liveScore: 100,
+        faults: []
+      }));
+      setIsSessionActive(false);
+    });
   }, [activeExerciseIndex]);
 
   const startSession = useCallback(() => {

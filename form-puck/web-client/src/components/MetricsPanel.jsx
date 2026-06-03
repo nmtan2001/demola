@@ -1,11 +1,12 @@
-import React from 'react';
+
 
 const MetricsPanel = ({ 
   metrics = {}, 
   activeExerciseName = '',
   isSessionActive = false,
   onStartSession,
-  onEndSession
+  onEndSession,
+  onViewDashboard
 }) => {
   const { repCount = 0, liveScore = 100, angles = {}, faults = [] } = metrics;
 
@@ -13,22 +14,30 @@ const MetricsPanel = ({
     <div className="metrics-panel glass-panel">
       <h2>{activeExerciseName ? `${activeExerciseName} Metrics` : 'Metrics'}</h2>
 
-      <div className="session-controls" style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
-        {!isSessionActive ? (
-          <button 
-            onClick={onStartSession}
-            style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: 'none', backgroundColor: '#10b981', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}
-          >
-            Start Session
-          </button>
-        ) : (
-          <button 
-            onClick={onEndSession}
-            style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: 'none', backgroundColor: '#ef4444', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}
-          >
-            End Session
-          </button>
-        )}
+      <div className="session-controls" style={{ marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {!isSessionActive ? (
+            <button 
+              onClick={onStartSession}
+              style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: 'none', backgroundColor: '#10b981', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}
+            >
+              Start Session
+            </button>
+          ) : (
+            <button 
+              onClick={onEndSession}
+              style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: 'none', backgroundColor: '#ef4444', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}
+            >
+              End Session
+            </button>
+          )}
+        </div>
+        <button 
+          onClick={onViewDashboard}
+          style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: 'none', backgroundColor: '#3b82f6', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}
+        >
+          📊 View Dashboard
+        </button>
       </div>
       
       <div className="metric-card">

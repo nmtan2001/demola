@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import { usePoseEngine } from '../hooks/usePoseEngine';
 const drawConnectors = window.drawConnectors;
 const drawLandmarks = window.drawLandmarks;

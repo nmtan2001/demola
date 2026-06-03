@@ -190,6 +190,19 @@
     filter: drop-shadow(0px 1px 1px rgba(255, 255, 255, 0.5));
 }
 
+/* Skeleton overlay canvas - sits in center of puck, above lens but below LEDs */
+.skeleton-canvas {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 65%;
+    height: 65%;
+    border-radius: 50%;
+    z-index: 4;
+    pointer-events: none;
+}
+
 .camera-lens-assembly {
     position: relative;
     width: 38%;

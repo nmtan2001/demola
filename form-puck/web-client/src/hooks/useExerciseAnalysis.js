@@ -58,10 +58,10 @@ export const useExerciseAnalysis = () => {
       
       const newAngles = { ...prev.angles };
       if (form_eval && form_eval.angles) {
-        if (form_eval.angles.hip) newAngles.hip = Math.round(form_eval.angles.hip);
-        if (form_eval.angles.knee) newAngles.knee = Math.round(form_eval.angles.knee);
-        if (form_eval.angles.shoulder) newAngles.shoulder = Math.round(form_eval.angles.shoulder);
-        if (form_eval.angles.elbow) newAngles.elbow = Math.round(form_eval.angles.elbow);
+        if (form_eval.angles.hip_angle != null) newAngles.hip = Math.round(form_eval.angles.hip_angle);
+        if (form_eval.angles.knee_angle != null) newAngles.knee = Math.round(form_eval.angles.knee_angle);
+        if (form_eval.angles.shoulder_angle != null) newAngles.shoulder = Math.round(form_eval.angles.shoulder_angle);
+        if (form_eval.angles.elbow_angle != null) newAngles.elbow = Math.round(form_eval.angles.elbow_angle);
       }
 
       // Audio feedback for reps

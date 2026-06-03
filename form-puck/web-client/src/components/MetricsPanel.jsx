@@ -18,14 +18,28 @@ const MetricsPanel = ({ metrics = {}, activeExerciseName = '' }) => {
       </div>
 
       {faults.length > 0 && (
-        <div className="faults-section" style={{ color: 'red', marginBottom: '1rem' }}>
-          <h4>Feedback</h4>
-          <ul>
-            {faults.map((fault, idx) => (
-              <li key={idx}>{fault.description || fault.name}</li>
-            ))}
-          </ul>
-        </div>
+        <>
+          <div className="faults-section" style={{ marginBottom: '0.5rem' }}>
+            <h4 style={{ color: '#ef4444', marginBottom: '0.5rem', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Indicators - What's Wrong</h4>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+              {faults.map((fault, idx) => (
+                <li key={idx} style={{ color: '#fca5a5', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '0.9rem' }}>
+                  {fault.name}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="feedback-section" style={{ marginBottom: '1rem' }}>
+            <h4 style={{ color: '#22d3ee', marginBottom: '0.5rem', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Feedback - What To Do</h4>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+              {faults.map((fault, idx) => (
+                <li key={idx} style={{ color: '#67e8f9', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '0.9rem' }}>
+                  {fault.description || fault.name}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </>
       )}
       
       <div className="angles-section">

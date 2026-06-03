@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prototipo Form Puck - 5 Segmentos Ajustados</title>
+    <style>
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: #ffffff;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .stage {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+            max-width: 1200px;
+            max-height: 900px;
+        }
+
+        .mounting-clamp {
+            position: absolute;
+            right: calc(50% - 34vh);
+            width: 16vh;
+            height: 12vh;
+            background: linear-gradient(to bottom, #2a2a2c 0%, #1e1e20 40%, #141415 70%, #2d2d30 100%);
+            border-radius: 4px;
+            box-shadow: 
+                inset 1px 1px 2px rgba(255,255,255,0.1),
+                0 10px 25px rgba(0,0,0,0.4);
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            padding-left: 2vh;
+        }
+
+        .clamp-joint {
+            width: 3.5vh;
+            height: 7vh;
+            background: radial-gradient(circle at 30% 30%, #444 0%, #111 80%);
+            border: 1px solid #000;
+            border-radius: 3px;
+            position: relative;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.8);
+        }
+
+        .clamp-pin {
+            position: absolute;
+            top: 15%;
+            left: 25%;
+            width: 50%;
+            height: 70%;
+            background: linear-gradient(to right, #666, #333, #555);
+            border-radius: 2px;
+            border: 1px solid #222;
+        }
+
+        .clamp-handle {
+            position: absolute;
+            left: 6vh;
+            width: 11vh;
+            height: 4vh;
+            background: linear-gradient(to bottom, #222 0%, #333 30%, #1a1a1a 70%, #111 100%);
+            border-radius: 4px;
+            border: 1px solid #111;
+            box-shadow: inset 0 1px 1px rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .clamp-texture {
+            width: 70%;
+            height: 60%;
+            background-image: radial-gradient(rgba(255,255,255,0.15) 15%, transparent 20%);
+            background-size: 4px 4px;
+            opacity: 0.7;
+        }
+
+        .puck-device {
+            position: relative;
+            width: 58vh;
+            height: 58vh;
+            border-radius: 50%;
+            background: radial-gradient(circle at 48% 48%, #3a3a3e 0%, #232326 45%, #141416 70%, #0a0a0b 100%);
+            box-shadow: 
+                inset 0 0 25px rgba(0,0,0,0.9),
+                inset 0 4px 8px rgba(255,255,255,0.2),
+                inset 0 -4px 12px rgba(0,0,0,0.8),
+                0 20px 50px rgba(0,0,0,0.45),
+                0 5px 15px rgba(0,0,0,0.2);
+            cursor: pointer;
+            z-index: 2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.1s ease;
+        }
+
+        .puck-device:active {
+            transform: scale(0.992);
+        }
+
+        .outer-bezel {
+            position: absolute;
+            top: 1.5%;
+            left: 1.5%;
+            right: 1.5%;
+            bottom: 1.5%;
+            border-radius: 50%;
+            border: 2px solid #1c1c1f;
+            background: transparent;
+            box-shadow: 
+                inset 0 2px 4px rgba(255,255,255,0.1),
+                0 2px 4px rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+
+        .inner-core {
+            position: relative;
+            width: 86%;
+            height: 86%;
+            border-radius: 50%;
+            background: radial-gradient(circle at 50% 50%, #1e1e21 0%, #121214 60%, #18181b 100%);
+            box-shadow: 
+                inset 0 10px 20px rgba(0,0,0,0.8),
+                inset 0 -10px 20px rgba(255,255,255,0.05),
+                0 4px 10px rgba(0,0,0,0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .led-ring-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 3;
+            overflow: visible; /* Esto previene que el resplandor se corte en forma de cuadrado */
+        }
+
+        .led-segment {
+            fill: none;
+            stroke-width: 28; 
+            stroke-linecap: round;
+            transition: stroke 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+                        filter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .led-segment[data-state="off"] {
+            stroke: rgba(25, 25, 28, 0.85);
+            filter: drop-shadow(0 0 1px rgba(0,0,0,0.8));
+        }
+
+        .led-segment[data-state="green"] {
+            stroke: #36f47a;
+            filter: drop-shadow(0 0 3px #15bd53) 
+                    drop-shadow(0 0 10px rgba(54, 244, 122, 0.85))
+                    drop-shadow(0 0 26px rgba(54, 244, 122, 0.45));
+        }
+
+        .led-segment[data-state="red"] {
+            stroke: #ff3344;
+            filter: drop-shadow(0 0 3px #d61122) 
+                    drop-shadow(0 0 10px rgba(255, 51, 68, 0.85))
+                    drop-shadow(0 0 26px rgba(255, 51, 68, 0.45));
+        }
+
+        .engravings-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+            overflow: visible;
+        }
+
+        .engraved-icon {
+            fill: none;
+            stroke: #000000;
+            stroke-width: 2.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            opacity: 0.95;
+            filter: drop-shadow(0px 1px 1px rgba(255, 255, 255, 0.5));
+        }
+
+        .camera-lens-assembly {
+            position: relative;
+            width: 38%;
+            height: 38%;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #141416 0%, #28282c 100%);
+            padding: 0.6vh;
+            box-shadow: 
+                0 4px 10px rgba(0,0,0,0.8),
+                inset 0 2px 4px rgba(255,255,255,0.15);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .lens-recess {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: #09090b;
+            box-shadow: inset 0 8px 16px rgba(0,0,0,0.95);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .lens-element-outer {
+            width: 82%;
+            height: 82%;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 35%, #1c202e 0%, #0d0f14 50%, #030305 100%);
+            box-shadow: 
+                inset 0 4px 10px rgba(255,255,255,0.18),
+                inset 0 -4px 10px rgba(0,0,0,0.85);
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .lens-element-inner {
+            width: 60%;
+            height: 60%;
+            border-radius: 50%;
+            background: radial-gradient(circle at 65% 65%, #0f2426 0%, #071114 40%, #010204 100%);
+            box-shadow: inset 0 0 12px rgba(0,0,0,0.9);
+            position: relative;
+        }
+
+        .lens-glare-primary {
+            position: absolute;
+            top: 12%;
+            left: 15%;
+            width: 50%;
+            height: 50%;
+            background: radial-gradient(circle at top left, rgba(0, 242, 254, 0.22) 0%, rgba(79, 79, 229, 0.08) 50%, transparent 80%);
+            border-radius: 50%;
+            transform: rotate(-15deg);
+        }
+
+        .lens-glare-secondary {
+            position: absolute;
+            bottom: 10%;
+            right: 15%;
+            width: 45%;
+            height: 45%;
+            background: radial-gradient(circle at bottom right, rgba(219, 76, 250, 0.15) 0%, rgba(0, 0, 0, 0) 70%);
+            border-radius: 50%;
+        }
+
+        .aperture-core {
+            position: absolute;
+            top: 44%;
+            left: 44%;
+            width: 12%;
+            height: 12%;
+            background: #000000;
+            border-radius: 50%;
+            box-shadow: 0 0 4px rgba(255, 255, 255, 0.4);
+        }
+
+        .aperture-specular {
+            position: absolute;
+            top: 38%;
+            left: 38%;
+            width: 2px;
+            height: 2px;
+            background: #ffffff;
+            border-radius: 50%;
+            filter: blur(0.2px);
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="stage">
+        <div class="mounting-clamp">
+            <div class="clamp-joint">
+                <div class="clamp-pin"></div>
+            </div>
+            <div class="clamp-handle">
+                <div class="clamp-texture"></div>
+            </div>
+        </div>
+
+        <div class="puck-device" onclick="toggleDemoMode()">
+            <div class="outer-bezel"></div>
+            
+            <div class="inner-core">
+                
+                <svg class="engravings-layer" viewBox="0 0 400 400">
+                    <g transform="translate(200, 200) rotate(0) translate(0, -123) scale(1.4)">
+                        <circle cx="0" cy="-4" r="4.5" class="engraved-icon"/>
+                        <path d="M -9 6 C -5 -1, 5 -1, 9 6" class="engraved-icon"/>
+                    </g>
+                    
+                    <g transform="translate(200, 200) rotate(72) translate(0, -123) scale(1.4)">
+                        <path d="M -2 6 L 6 -2 L 0 -8" class="engraved-icon"/>
+                        <path d="M 0 3 Q 4 -1 2 -5" class="engraved-icon"/>
+                    </g>
+
+                    <g transform="translate(200, 200) rotate(144) translate(0, -123) scale(1.4)">
+                        <path d="M -2 6 L 5 -1 L 0 -8 L 4 -8" class="engraved-icon"/>
+                    </g>
+
+                    <g transform="translate(200, 200) rotate(-144) translate(0, -123) scale(1.4)">
+                        <path d="M 2 6 L -5 -1 L 0 -8 L -4 -8" class="engraved-icon"/>
+                    </g>
+
+                    <g transform="translate(200, 200) rotate(-72) translate(0, -123) scale(1.4)">
+                        <path d="M 2 6 L -6 -2 L 0 -8" class="engraved-icon"/>
+                        <path d="M 0 3 Q -4 -1 -2 -5" class="engraved-icon"/>
+                    </g>
+                </svg>
+
+                <svg class="led-ring-svg" viewBox="0 0 400 400">
+                    <circle id="led-1" cx="200" cy="200" r="182" class="led-segment" 
+                            stroke-dasharray="210 934" transform="rotate(-123 200 200)" data-state="off" />
+                    
+                    <circle id="led-2" cx="200" cy="200" r="182" class="led-segment" 
+                            stroke-dasharray="210 934" transform="rotate(-51 200 200)" data-state="off" />
+                    
+                    <circle id="led-3" cx="200" cy="200" r="182" class="led-segment" 
+                            stroke-dasharray="210 934" transform="rotate(21 200 200)" data-state="off" />
+                    
+                    <circle id="led-4" cx="200" cy="200" r="182" class="led-segment" 
+                            stroke-dasharray="210 934" transform="rotate(93 200 200)" data-state="off" />
+                    
+                    <circle id="led-5" cx="200" cy="200" r="182" class="led-segment" 
+                            stroke-dasharray="210 934" transform="rotate(165 200 200)" data-state="off" />
+                </svg>
+
+                <div class="camera-lens-assembly">
+                    <div class="lens-recess">
+                        <div class="lens-element-outer">
+                            <div class="lens-element-inner">
+                                <div class="lens-glare-secondary"></div>
+                                <div class="lens-glare-primary"></div>
+                                <div class="aperture-core"></div>
+                                <div class="aperture-specular"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function setLedState(ledIndex, state) {
+            const led = document.getElementById(`led-${ledIndex}`);
+            if(led) {
+                led.dataset.state = state;
+            }
+        }
+
+        function toggleDemoMode() {
+            const led1 = document.getElementById('led-1');
+            
+            if (led1.dataset.state === 'off') {
+                setLedState(1, 'green'); 
+                setLedState(2, 'green'); 
+                setLedState(3, 'red');   
+                setLedState(4, 'red');   
+                setLedState(5, 'green'); 
+            } else if (led1.dataset.state === 'green') {
+                for(let i=1; i<=5; i++) setLedState(i, 'red');
+            } else {
+                for(let i=1; i<=5; i++) setLedState(i, 'off');
+            }
+        }
+    </script>
+</body>
+</html>

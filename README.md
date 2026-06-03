@@ -1,131 +1,99 @@
 # Form Puck
 
-Edge AI gym form checker. Runs entirely on-device using a webcam - no cloud, no data leaving the machine.
+Edge AI gym form checker. Runs entirely on-device inside your browser using your webcam - no cloud, no backend servers, no data leaving the machine.
 
-Built as a Demola university project prototype. Target hardware is laptop/webcam now, Raspberry Pi 5 later.
+Built as a Demola university project prototype. It features a beautiful, dynamic 3D "Form Puck" interface that overlays over your camera to provide real-time metrics and feedback.
+
+**Live Demo:** [https://nmtan2001.github.io/demola/](https://nmtan2001.github.io/demola/)
 
 ## What It Does
 
-- Detects body pose in real-time using MediaPipe
-- Tracks reps for squat, bicep curl, and deadlift
-- Scores form and flags common faults (back rounding, knee cave, elbow swing, etc.)
-- Gives audio + voice feedback ("Chest up", "Go deeper", "Knees out")
-- Streams a web dashboard with live skeleton overlay, rep counter, score bar, and angle metrics
+- Detects body pose in real-time using MediaPipe inside the browser
+- Tracks reps for 6 different exercises (Squat, Bicep Curl, Deadlift, Lunge, Overhead Press, Push-up)
+- Scores form and flags common faults (e.g., back rounding, knee cave, asymmetric descent)
+- Provides immediate visual feedback via a 3D responsive "Form Puck" widget
+- Smooth, modern glassmorphism UI overlaid directly onto your webcam feed
 
 ## Architecture
 
+The project has evolved from a Python backend into a fully client-side web application. 
+
 ```
-Camera Layer        Processing Layer           Feedback Layer
-+-------------+    +------------------+       +------------------+
-| WebcamCamera|--->| PoseExtractor    |------>| Dashboard (Flask) |
-| (OpenCV)    |    | AngleCalculator  |       | AudioFeedback    |
-|             |    | RepDetector      |       | SkeletonRenderer |
-|             |    | FormScorer       |       | SessionLogger    |
-|             |    | ExerciseAnalyzer |       +------------------+
-+-------------+    +------------------+
+Webcam API --> MediaPipe JS (Pose Detection) --> React Hooks (State Machine) --> 3D Puck UI / Metrics Panel
 ```
 
-All AI runs locally via MediaPipe's Tasks API with a `.task` model file (~9MB).
+All AI and image processing run locally using the browser's MediaPipe Tasks API.
 
-## Quick Start
+## Quick Start (Local Development)
 
 ```bash
-cd form-puck
-pip install -r requirements.txt
-python3 main.py
+cd form-puck/web-client
+npm install
+npm run dev
 ```
 
-Open `http://localhost:5000` in a browser. The webcam feed with skeleton overlay and metrics panel will appear.
+Open the provided `localhost` link in your browser. The webcam feed will initialize, the skeleton overlay will appear, and you can begin exercising!
 
-## Exercises
+## Supported Exercises
 
-Defined in JSON config files under `config/exercises/`. Each exercise specifies:
+You can seamlessly cycle through exercises by clicking the 3D Form Puck widget in the bottom corner of the screen.
 
-- **Landmarks** - which MediaPipe keypoints to track
-- **Angles** - joint angle definitions (primary + secondary sides)
-- **Rep detection** - state machine thresholds
-- **Scoring** - faults with deduction weights and hysteresis margins
-
-### Supported Exercises
-
-| Exercise | Rep Detection | Faults |
+| Exercise | Tracking Engine | Faults Detected |
 |---|---|---|
-| Squat | Knee angle 4-state machine | Back rounding, insufficient depth, knee cave, asymmetric descent, bounce |
-| Bicep Curl | Elbow angle 4-state machine | Elbow swing, insufficient contraction |
-| Deadlift | Knee angle (same as squat) | Back rounding, bar path deviation, hip shoot |
-
-### Adding a New Exercise
-
-1. Create a JSON file in `config/exercises/`
-2. Define landmarks, angles, rep detection config, and scoring faults
-3. It will appear in the dashboard's exercise dropdown automatically
+| **Squat** | Knee angle 4-state machine | Back rounding, insufficient depth, knee cave, asymmetric descent, bounce |
+| **Bicep Curl** | Elbow angle 4-state machine | Elbow swing, insufficient contraction, incomplete lockout |
+| **Deadlift** | Knee angle 4-state machine | Back rounding, bar path deviation, hip shoot |
+| **Lunge** | Knee angle 4-state machine | Knee over toe, asymmetric descent, back rounding |
+| **Overhead Press** | Shoulder angle 4-state machine | Incomplete lockout, arching back, asymmetric extension |
+| **Push-up** | Elbow angle 4-state machine | Sagging hips, piking hips, half rep |
 
 ## Key Features
 
-- **3D world landmarks** - Uses MediaPipe's camera-independent world coordinates for angle calculation, with 2D fallback
-- **Hysteresis fault detection** - Separate trigger/clear thresholds prevent rapid-fire alerts
-- **EMA smoothing** - Reduces keypoint jitter (alpha=0.35)
-- **Voice coaching** - Spoken fault cues via pyttsx3 with 5-second cooldown (falls back to beep tones if unavailable)
-- **Mirror mode** - Default on, so the feed feels like a mirror
-- **Session logging** - JSON after-action reports saved to `session_logs/`
-
-## Configuration
-
-`config/app_config.json` controls camera settings and MediaPipe parameters:
-
-| Setting | Default | Description |
-|---|---|---|
-| camera_index | 0 | Webcam device index |
-| frame_width | 640 | Capture resolution |
-| frame_height | 480 | Capture resolution |
-| target_fps | 30 | Target frame rate |
-| default_exercise | squat | Exercise loaded on startup |
-| model_dir | models | Directory for .task model files |
+- **3D World Landmarks** - Uses MediaPipe's camera-independent world coordinates for angle calculation to ensure depth accuracy.
+- **Hysteresis Fault Detection** - Separate trigger/clear thresholds prevent rapid-fire alerts and false positives.
+- **EMA Smoothing** - Reduces keypoint jitter (alpha=0.35) for stable angle tracking.
+- **Physical "Puck" UI** - The UI design mimics a physical hardware interface. The LEDs pulse dynamically based on active repetitions, and flash red instantly upon form faults.
+- **CI/CD** - Automatically deploys to GitHub Pages via GitHub Actions whenever code is pushed to `main`.
 
 ## Tech Stack
 
-- **Python 3** - Main language
-- **MediaPipe Tasks API** - On-device pose estimation
-- **OpenCV** - Camera capture and frame processing
-- **Flask** - Web dashboard with MJPEG streaming
-- **pygame** - Beep tone audio feedback
-- **pyttsx3** - Voice coaching (optional, graceful fallback)
-- **NumPy** - Math operations
+- **React 19** - Core UI framework
+- **Vite** - Lightning-fast build tool
+- **MediaPipe JavaScript** - `@mediapipe/pose`, `@mediapipe/camera_utils`, `@mediapipe/drawing_utils` for running the pose extraction model client-side.
+- **Vanilla CSS** - Rich aesthetics, glassmorphism, 3D CSS transformations, micro-animations, and dynamic variables.
 
 ## Project Structure
 
 ```
 form-puck/
-  main.py                 # Entry point
-  requirements.txt
-  config/
-    app_config.json
-    exercises/
-      squat.json
-      bicep_curl.json
-      deadlift.json
-  camera/
-    base_camera.py        # Abstract camera interface
-    webcam_camera.py      # OpenCV implementation
-  processing/
-    pose_extractor.py     # MediaPipe pose detection
-    angle_calculator.py   # Angle math + EMA smoothing
-    rep_detector.py       # State machine rep counting
-    form_scorer.py        # Fault detection with hysteresis
-    exercise_analyzer.py  # Orchestrates processing pipeline
-  feedback/
-    dashboard.py          # Flask web UI + MJPEG stream
-    skeleton_renderer.py  # Draws skeleton + annotations on frame
-    audio_feedback.py     # Beep tones + voice coaching
-  session/
-    session_logger.py     # Rep logging + after-action reports
-  models/
-    pose_landmarker_full.task  # MediaPipe model (9MB)
+  web-client/
+    index.html               # Main entry point
+    package.json             
+    vite.config.js           # Build settings (configured for gh-pages base path)
+    src/
+      App.jsx                # Main application wrapper
+      App.css                # Global and layout styles
+      components/
+        CameraViewport.jsx   # MediaPipe initialization and skeleton drawing
+        FormPuckWidget.jsx   # 3D interactive puck interface
+        MetricsPanel.jsx     # On-screen metrics, scores, and active faults
+      hooks/
+        useExerciseAnalysis.js # Orchestrates pose extraction and state management
+        usePoseEngine.js     # MediaPipe setup hook
+      logic/
+        ExerciseAnalyzer.js  # Javascript port of the Python state machine
+        mathUtils.js         # Angle math and EMA smoothing
+      config/
+        exercises.js         # JSON configurations for all 6 exercises
 ```
+
+## Continuous Deployment
+
+This repository is configured to auto-deploy. Any changes pushed to the `main` branch inside `form-puck/web-client` will trigger a GitHub Actions workflow (`.github/workflows/deploy.yml`) that builds the Vite project and pushes the compiled assets to the `gh-pages` branch. 
 
 ## Roadmap
 
-- Raspberry Pi 5 port with picamera2
-- More exercises (overhead press, lunges, pull-ups)
-- Multi-user profiles
-- Bluetooth sync to phone app
+- Mobile-first responsiveness and PWA installation support
+- Bluetooth sync to connect the UI to an *actual* physical puck device
+- User profiles and historical performance tracking
+- Audio feedback engine integration (Edge TTS)

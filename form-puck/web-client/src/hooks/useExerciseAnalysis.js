@@ -15,14 +15,18 @@ export const useExerciseAnalysis = () => {
     faults: []
   });
 
+  const [isSessionActive, setIsSessionActive] = useState(false);
+  const [sessionStartTime, setSessionStartTime] = useState(null);
+
   const [activeExerciseIndex, setActiveExerciseIndex] = useState(0);
 
   const analyzerRef = useRef(null);
   const lastRepCountRef = useRef(0);
 
   const cycleExercise = useCallback(() => {
+    if (isSessionActive) return; // Prevent changing exercise mid-session
     setActiveExerciseIndex(prev => (prev + 1) % EXERCISE_CONFIGS.length);
-  }, []);
+  }, [isSessionActive]);
 
   useEffect(() => {
     analyzerRef.current = new ExerciseAnalyzer(EXERCISE_CONFIGS[activeExerciseIndex]);
@@ -33,7 +37,40 @@ export const useExerciseAnalysis = () => {
       liveScore: 100,
       faults: []
     }));
+    setIsSessionActive(false);
   }, [activeExerciseIndex]);
+
+  const startSession = useCallback(() => {
+    if (analyzerRef.current) {
+      analyzerRef.current.reset();
+    }
+    lastRepCountRef.current = 0;
+    setMetrics(prev => ({
+      ...prev,
+      repCount: 0,
+      liveScore: 100,
+      faults: []
+    }));
+    setSessionStartTime(Date.now());
+    setIsSessionActive(true);
+  }, []);
+
+  const endSession = useCallback(() => {
+    setIsSessionActive(false);
+    if (!sessionStartTime) return;
+
+    const durationSeconds = Math.round((Date.now() - sessionStartTime) / 1000);
+    const sessionData = {
+      id: Date.now().toString(),
+      exercise: EXERCISE_CONFIGS[activeExerciseIndex].name,
+      date: new Date().toISOString(),
+      reps: lastRepCountRef.current,
+      duration: durationSeconds,
+    };
+
+    const existing = JSON.parse(localStorage.getItem('formPuckSessions') || '[]');
+    localStorage.setItem('formPuckSessions', JSON.stringify([sessionData, ...existing]));
+  }, [sessionStartTime, activeExerciseIndex]);
 
   const onPose = useCallback((results) => {
     if (!analyzerRef.current) return;
@@ -73,5 +110,13 @@ export const useExerciseAnalysis = () => {
 
   const activeExerciseName = EXERCISE_CONFIGS[activeExerciseIndex].name;
 
-  return { metrics, onPose, cycleExercise, activeExerciseName };
+  return { 
+    metrics, 
+    onPose, 
+    cycleExercise, 
+    activeExerciseName,
+    isSessionActive,
+    startSession,
+    endSession
+  };
 };

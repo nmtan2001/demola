@@ -1,14 +1,38 @@
 import React from 'react';
 
-const MetricsPanel = ({ metrics = {}, activeExerciseName = '' }) => {
+const MetricsPanel = ({ 
+  metrics = {}, 
+  activeExerciseName = '',
+  isSessionActive = false,
+  onStartSession,
+  onEndSession
+}) => {
   const { repCount = 0, liveScore = 100, angles = {}, faults = [] } = metrics;
 
   return (
     <div className="metrics-panel glass-panel">
       <h2>{activeExerciseName ? `${activeExerciseName} Metrics` : 'Metrics'}</h2>
+
+      <div className="session-controls" style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
+        {!isSessionActive ? (
+          <button 
+            onClick={onStartSession}
+            style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: 'none', backgroundColor: '#10b981', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}
+          >
+            Start Session
+          </button>
+        ) : (
+          <button 
+            onClick={onEndSession}
+            style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: 'none', backgroundColor: '#ef4444', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}
+          >
+            End Session
+          </button>
+        )}
+      </div>
       
       <div className="metric-card">
-        <span className="metric-label">Rep Count</span>
+        <span className="metric-label">Rep Count {isSessionActive ? '(Recording)' : '(Idle)'}</span>
         <span className="metric-value">{repCount}</span>
       </div>
       

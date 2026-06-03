@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import './App.css';
 import CameraViewport from './components/CameraViewport';
 import MetricsPanel from './components/MetricsPanel';
@@ -6,9 +6,19 @@ import { useExerciseAnalysis } from './hooks/useExerciseAnalysis';
 
 import FormPuckWidget from './components/FormPuckWidget';
 import DemoSkeleton from './components/DemoSkeleton';
+import Dashboard from './components/Dashboard';
 
 function App() {
-  const { metrics, onPose, cycleExercise, activeExerciseName } = useExerciseAnalysis();
+  const [currentView, setCurrentView] = useState('tracker'); // 'tracker' or 'dashboard'
+  const { 
+    metrics, 
+    onPose, 
+    cycleExercise, 
+    activeExerciseName,
+    isSessionActive,
+    startSession,
+    endSession
+  } = useExerciseAnalysis();
 
   // Logical body regions used by the analyzer.
   // Side-specific faults (elbow_swing_left, knee_cave_right, etc.) are generated
@@ -33,13 +43,19 @@ function App() {
   // 1 posture, 2 right arm, 3 right leg, 4 left leg, 5 left arm.
   const ledStates = [postureLed, rightArmLed, rightLegLed, leftLegLed, leftArmLed];
 
-  return (
-    <div className="app">
+  const renderTrackerView = () => (
+    <>
       <div className="main-content" style={{ position: 'relative', width: '100%', height: '100%' }}>
         <CameraViewport onPose={onPose} />
 
         {/* Corner widgets */}
         <div className="corner-widgets">
+          <button 
+            onClick={() => setCurrentView('dashboard')}
+            style={{ marginBottom: '1rem', padding: '0.5rem 1rem', borderRadius: '8px', border: 'none', backgroundColor: '#3b82f6', color: 'white', cursor: 'pointer', pointerEvents: 'auto', fontWeight: 'bold' }}
+          >
+            📊 View Dashboard
+          </button>
           <div className="puck-widget-wrap">
             <FormPuckWidget onClick={cycleExercise} ledStates={ledStates} />
           </div>
@@ -48,7 +64,23 @@ function App() {
           </div>
         </div>
       </div>
-      <MetricsPanel metrics={metrics} activeExerciseName={activeExerciseName} />
+      <MetricsPanel 
+        metrics={metrics} 
+        activeExerciseName={activeExerciseName} 
+        isSessionActive={isSessionActive}
+        onStartSession={startSession}
+        onEndSession={endSession}
+      />
+    </>
+  );
+
+  return (
+    <div className="app">
+      {currentView === 'dashboard' ? (
+        <Dashboard onBack={() => setCurrentView('tracker')} />
+      ) : (
+        renderTrackerView()
+      )}
     </div>
   );
 }

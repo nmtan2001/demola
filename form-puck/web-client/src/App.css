@@ -150,6 +150,8 @@
 
 .camera-canvas {
   z-index: 10;
+  transform: scaleX(-1);
+  transform-origin: center;
 }
 
 .placeholder-text {

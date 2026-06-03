@@ -10,7 +10,7 @@ import DemoSkeleton from './components/DemoSkeleton';
 function App() {
   const { metrics, onPose, cycleExercise, activeExerciseName } = useExerciseAnalysis();
 
-  // 5 LEDs: Posture, Left Arm, Right Arm, Left Leg, Right Leg
+  // Logical body regions used by the analyzer.
   // Side-specific faults (elbow_swing_left, knee_cave_right, etc.) are generated
   // by FormScorer._checkFault using the SIDE_ARM_FAULTS / SIDE_LEG_FAULTS logic
   const POSTURE_FAULTS = ['back_rounding', 'arching_back', 'sagging_hips', 'piking_hips', 'hip_shoot', 'bar_path_deviation'];
@@ -23,13 +23,15 @@ function App() {
 
   const isTracking = Object.values(metrics.angles).some(v => v !== '--');
 
-  const ledStates = [
-    isTracking ? (metrics.faults.some(f => POSTURE_FAULTS.includes(f.name)) ? 'red' : 'green') : 'off',         // LED 1: Posture
-    isTracking ? (metrics.faults.some(f => LEFT_ARM_FAULTS.concat(ALL_LIMBS_FAULTS).includes(f.name)) ? 'red' : 'green') : 'off',   // LED 2: Left Arm
-    isTracking ? (metrics.faults.some(f => RIGHT_ARM_FAULTS.concat(ALL_LIMBS_FAULTS).includes(f.name)) ? 'red' : 'green') : 'off',  // LED 3: Right Arm
-    isTracking ? (metrics.faults.some(f => LEFT_LEG_FAULTS.concat(ALL_LIMBS_FAULTS).includes(f.name)) ? 'red' : 'green') : 'off',   // LED 4: Left Leg
-    isTracking ? (metrics.faults.some(f => RIGHT_LEG_FAULTS.concat(ALL_LIMBS_FAULTS).includes(f.name)) ? 'red' : 'green') : 'off',  // LED 5: Right Leg
-  ];
+  const postureLed = isTracking ? (metrics.faults.some(f => POSTURE_FAULTS.includes(f.name)) ? 'red' : 'green') : 'off';
+  const leftArmLed = isTracking ? (metrics.faults.some(f => LEFT_ARM_FAULTS.concat(ALL_LIMBS_FAULTS).includes(f.name)) ? 'red' : 'green') : 'off';
+  const rightArmLed = isTracking ? (metrics.faults.some(f => RIGHT_ARM_FAULTS.concat(ALL_LIMBS_FAULTS).includes(f.name)) ? 'red' : 'green') : 'off';
+  const leftLegLed = isTracking ? (metrics.faults.some(f => LEFT_LEG_FAULTS.concat(ALL_LIMBS_FAULTS).includes(f.name)) ? 'red' : 'green') : 'off';
+  const rightLegLed = isTracking ? (metrics.faults.some(f => RIGHT_LEG_FAULTS.concat(ALL_LIMBS_FAULTS).includes(f.name)) ? 'red' : 'green') : 'off';
+
+  // Physical puck segment order (clockwise from top):
+  // 1 posture, 2 right arm, 3 right leg, 4 left leg, 5 left arm.
+  const ledStates = [postureLed, rightArmLed, rightLegLed, leftLegLed, leftArmLed];
 
   return (
     <div className="app">

@@ -36,7 +36,7 @@ const MetricsPanel = ({
           onClick={onViewDashboard}
           style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: 'none', backgroundColor: '#3b82f6', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}
         >
-          📊 View Dashboard
+          View Dashboard
         </button>
       </div>
       

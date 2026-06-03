@@ -103,7 +103,6 @@ export const EXERCISE_CONFIGS = [
         "shoulder": {
             "points": ["left_hip", "left_shoulder", "left_elbow"],
             "points_secondary": ["right_hip", "right_shoulder", "right_elbow"],
-            "use_2d_only": true,
             "ideal_min": 0,
             "ideal_max": 30
         }
@@ -125,7 +124,7 @@ export const EXERCISE_CONFIGS = [
                 "deduction": 25,
                 "threshold_deg": 35,
                 "clear_margin_deg": 5,
-                "active_during": ["DESCENDING", "ACTIVE"],
+                "active_during": ["STANDING", "DESCENDING", "ACTIVE", "RETURN"],
                 "description": "Elbow swinging - keep elbow tucked"
             },
             "insufficient_contraction": {

@@ -131,7 +131,7 @@ export const EXERCISE_CONFIGS = [
                 "deduction": 20,
                 "threshold_deg": 70,
                 "clear_margin_deg": 5,
-                "active_during": ["DESCENDING"],
+                "active_during": ["DESCENDING", "ACTIVE", "RETURN"],
                 "description": "Not curling all the way up - full range of motion"
             }
         }

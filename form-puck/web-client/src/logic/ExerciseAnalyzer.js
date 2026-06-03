@@ -882,6 +882,9 @@ export class ExerciseAnalyzer {
     this._repFaultsAccumulated = {};
     this._repFaultAbsentFrames = {};
     this._repScores = [];
+    this._primaryMovementAngle = this._inferPrimaryMovementAngle();
+    this._repIdealDistance = {};
+    this._initRepQualityTracking();
   }
 
   get exerciseId() { return this._id; }
@@ -900,6 +903,7 @@ export class ExerciseAnalyzer {
       this._repFaultsAccumulated = {};
       this._repFaultAbsentFrames = {};
       this._repScores = [];
+      this._initRepQualityTracking();
       this._formScorer.clearRep();
     }
 
@@ -915,6 +919,7 @@ export class ExerciseAnalyzer {
 
     if (this._repDetector.inRep && landmarks) {
       this._repScores.push(formEval.score);
+      this._updateRepQualityTracking(formEval.angles);
       const currentFaultNames = new Set(formEval.faults.map(f => f.name));
 
       for (const fault of formEval.faults) {
@@ -954,13 +959,32 @@ export class ExerciseAnalyzer {
     if (repInfo.rep_completed) {
       const baseScore = this._formScorer._scoringConfig.base_score || 100;
       const finalFaults = Object.values(this._repFaultsAccumulated);
+      const qualityAssessment = this._computeRepQualityAssessment();
+      const qualityPenalty = qualityAssessment.penalty;
+
+      if (qualityPenalty > 0) {
+        finalFaults.push(this._buildQualityPenaltyFault(qualityAssessment));
+      }
+
       let deductions = 0;
       for (const f of finalFaults) deductions += f.deduction;
-      
-      const finalScore = Math.max(0, baseScore - deductions);
+
+      const faultBasedScore = Math.max(0, baseScore - deductions);
+
+      let consistencyScore = faultBasedScore;
+      if (this._repScores.length > 0) {
+        const sum = this._repScores.reduce((acc, s) => acc + s, 0);
+        const avg = sum / this._repScores.length;
+        const min = Math.min(...this._repScores);
+        // Bias toward stricter scoring: transiently poor form still affects final score.
+        consistencyScore = (avg * 0.65) + (min * 0.35);
+      }
+
+      const finalScore = Math.max(0, Math.min(faultBasedScore, consistencyScore));
       
       repInfo.form_score = Math.round(finalScore * 10) / 10;
       repInfo.faults = finalFaults;
+      repInfo.quality_penalty = Math.round(qualityPenalty * 10) / 10;
 
       formEval.score = repInfo.form_score;
       formEval.faults = finalFaults;
@@ -969,6 +993,7 @@ export class ExerciseAnalyzer {
       this._repFaultsAccumulated = {};
       this._repFaultAbsentFrames = {};
       this._repScores = [];
+      this._initRepQualityTracking();
     }
 
     this._currentEvaluation = formEval;
@@ -986,5 +1011,137 @@ export class ExerciseAnalyzer {
     this._repFaultsAccumulated = {};
     this._repFaultAbsentFrames = {};
     this._repScores = [];
+    this._initRepQualityTracking();
+  }
+
+  _inferPrimaryMovementAngle() {
+    const angles = this._config.angles || {};
+    const repCfg = this._config.rep_detection || {};
+    const inferredByRepPoints = this._inferAngleNameFromRepDetection();
+
+    if (inferredByRepPoints && angles[inferredByRepPoints]) {
+      return inferredByRepPoints;
+    }
+
+    if (repCfg.state_machine === 'contracting_extending' && angles.elbow) {
+      return 'elbow';
+    }
+
+    if (repCfg.direction === 'increase' && angles.elbow) {
+      return 'elbow';
+    }
+
+    if (angles.knee) return 'knee';
+    if (angles.elbow) return 'elbow';
+    if (angles.hip) return 'hip';
+
+    for (const [name, cfg] of Object.entries(angles)) {
+      if (cfg?.ideal_min != null && cfg?.ideal_max != null) {
+        return name;
+      }
+    }
+
+    return null;
+  }
+
+  _inferAngleNameFromRepDetection() {
+    const repCfg = this._config.rep_detection || {};
+    const candidates = [repCfg.angle_points, repCfg.angle_points_secondary];
+
+    for (const points of candidates) {
+      if (!Array.isArray(points) || points.length !== 3) continue;
+      const centerPointName = String(points[1]).toLowerCase();
+
+      if (centerPointName.includes('knee')) return 'knee';
+      if (centerPointName.includes('hip')) return 'hip';
+      if (centerPointName.includes('elbow')) return 'elbow';
+      if (centerPointName.includes('shoulder')) return 'shoulder';
+    }
+
+    return null;
+  }
+
+  _initRepQualityTracking() {
+    this._repIdealDistance = {};
+    const angles = this._config.angles || {};
+
+    for (const [angleName, cfg] of Object.entries(angles)) {
+      if (cfg?.ideal_min == null || cfg?.ideal_max == null) continue;
+      this._repIdealDistance[angleName] = Number.POSITIVE_INFINITY;
+    }
+  }
+
+  _updateRepQualityTracking(metrics = {}) {
+    for (const angleName of Object.keys(this._repIdealDistance)) {
+      const cfg = this._config.angles?.[angleName];
+      if (!cfg) continue;
+
+      const value = metrics[`${angleName}_angle`];
+      if (value == null || Number.isNaN(value)) continue;
+
+      const distance = ExerciseAnalyzer._distanceToRange(value, cfg.ideal_min, cfg.ideal_max);
+      if (distance < this._repIdealDistance[angleName]) {
+        this._repIdealDistance[angleName] = distance;
+      }
+    }
+  }
+
+  _computeRepQualityAssessment() {
+    let penalty = 0;
+    let primaryDistance = 0;
+    let primarySpan = 1;
+    let primarySource = this._primaryMovementAngle || null;
+
+    for (const [angleName, bestDistance] of Object.entries(this._repIdealDistance)) {
+      if (!Number.isFinite(bestDistance) || bestDistance <= 0) continue;
+
+      const cfg = this._config.angles?.[angleName];
+      if (!cfg) continue;
+
+      const span = Math.max(1, Math.abs((cfg.ideal_max ?? 0) - (cfg.ideal_min ?? 0)));
+      const normalizedDistance = bestDistance / span;
+
+      const maxDeduction = angleName === this._primaryMovementAngle ? 30 : 10;
+      penalty += Math.min(maxDeduction, normalizedDistance * maxDeduction);
+
+      if (angleName === this._primaryMovementAngle) {
+        primaryDistance = bestDistance;
+        primarySpan = span;
+        primarySource = angleName;
+      }
+    }
+
+    return {
+      penalty,
+      primaryDistance,
+      primarySpan,
+      primarySource
+    };
+  }
+
+  _buildQualityPenaltyFault(qualityAssessment) {
+    const angleName = qualityAssessment.primarySource || this._primaryMovementAngle || 'movement';
+    const shortfallDeg = Math.max(0, qualityAssessment.primaryDistance || 0);
+    const normalized = Math.min(1, shortfallDeg / Math.max(1, qualityAssessment.primarySpan || 1));
+
+    let guidance = 'Use fuller range of motion';
+    if (angleName === 'knee') guidance = 'Go deeper and complete the range';
+    else if (angleName === 'hip') guidance = 'Complete the hip hinge range';
+    else if (angleName === 'elbow') guidance = 'Complete the elbow range';
+    else if (angleName === 'shoulder') guidance = 'Complete the shoulder range';
+
+    return {
+      name: `insufficient_range_of_motion_${angleName}`,
+      description: guidance,
+      value: Math.round((normalized * 100) * 10) / 10,
+      deduction: Math.round((qualityAssessment.penalty || 0) * 10) / 10,
+      direction: 'above'
+    };
+  }
+
+  static _distanceToRange(value, min, max) {
+    if (value < min) return min - value;
+    if (value > max) return value - max;
+    return 0;
   }
 }

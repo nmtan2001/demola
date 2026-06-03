@@ -47,34 +47,34 @@ export const EXERCISE_CONFIGS = [
                 "deduction": 20,
                 "threshold_deg": 45,
                 "clear_margin_deg": 5,
-                "active_during": ["ACTIVE", "PEAK", "RETURN"],
+                "active_during": ["STANDING", "DESCENDING", "ACTIVE", "RETURN"],
                 "description": "Back rounding - excessive forward lean"
             },
             "insufficient_depth": {
                 "deduction": 15,
                 "threshold_deg": 110,
                 "clear_margin_deg": 5,
-                "active_during": ["ACTIVE", "PEAK"],
+                "active_during": ["ACTIVE"],
                 "description": "Insufficient depth - go deeper"
             },
             "knee_cave": {
                 "deduction": 15,
                 "threshold_deg": 15,
                 "clear_margin_deg": 5,
-                "active_during": ["ACTIVE", "PEAK"],
+                "active_during": ["STANDING", "DESCENDING", "ACTIVE", "RETURN"],
                 "description": "Knee cave detected - push knees out"
             },
             "asymmetric_descent": {
                 "deduction": 10,
                 "threshold_deg": 10,
                 "clear_margin_deg": 5,
-                "active_during": ["ACTIVE", "PEAK"],
+                "active_during": ["STANDING", "DESCENDING", "ACTIVE", "RETURN"],
                 "description": "Asymmetric descent - even out both sides"
             },
             "bounce_at_bottom": {
                 "deduction": 10,
                 "velocity_threshold": 0.3,
-                "active_during": ["ACTIVE", "PEAK"],
+                "active_during": ["ACTIVE"],
                 "description": "Bouncing at bottom - control the movement"
             }
         }
@@ -125,14 +125,14 @@ export const EXERCISE_CONFIGS = [
                 "deduction": 25,
                 "threshold_deg": 35,
                 "clear_margin_deg": 5,
-                "active_during": ["ACTIVE", "PEAK"],
+                "active_during": ["STANDING", "DESCENDING", "ACTIVE", "RETURN"],
                 "description": "Elbow swinging - keep elbow tucked"
             },
             "insufficient_contraction": {
                 "deduction": 20,
                 "threshold_deg": 70,
                 "clear_margin_deg": 5,
-                "active_during": ["ACTIVE", "PEAK"],
+                "active_during": ["STANDING", "DESCENDING", "ACTIVE", "RETURN"],
                 "description": "Not curling all the way up - full range of motion"
             }
         }
@@ -187,14 +187,14 @@ export const EXERCISE_CONFIGS = [
                 "deduction": 25,
                 "threshold_deg": 60,
                 "clear_margin_deg": 5,
-                "active_during": ["ACTIVE", "PEAK", "RETURN"],
+                "active_during": ["STANDING", "DESCENDING", "ACTIVE", "RETURN"],
                 "description": "Torso forward lean - keep chest up"
             },
             "bar_path_deviation": {
                 "deduction": 15,
                 "threshold_cm": 15,
                 "clear_margin_cm": 5,
-                "active_during": ["ACTIVE", "PEAK"],
+                "active_during": ["DESCENDING", "ACTIVE", "RETURN"],
                 "description": "Bar drifting from legs"
             },
             "hip_shoot": {
@@ -256,7 +256,7 @@ export const EXERCISE_CONFIGS = [
                 "clear_margin_cm": 3,
                 "direction": "above",
                 "knee_angle_mode": "max",
-                "active_during": ["PEAK"],
+                "active_during": ["ACTIVE"],
                 "description": "Knee too far forward"
             },
             "insufficient_depth": {
@@ -264,21 +264,21 @@ export const EXERCISE_CONFIGS = [
                 "threshold_deg": 110,
                 "clear_margin_deg": 5,
                 "knee_angle_mode": "max",
-                "active_during": ["ACTIVE", "PEAK"],
+                "active_during": ["ACTIVE"],
                 "description": "Not deep enough - lower your hips"
             },
             "back_rounding": {
                 "deduction": 20,
                 "threshold_deg": 35,
                 "clear_margin_deg": 5,
-                "active_during": ["ACTIVE", "PEAK", "RETURN"],
+                "active_during": ["STANDING", "DESCENDING", "ACTIVE", "RETURN"],
                 "description": "Leaning too far forward"
             },
             "asymmetric_descent": {
                 "deduction": 10,
                 "threshold_deg": 15,
                 "clear_margin_deg": 5,
-                "active_during": ["ACTIVE", "PEAK"],
+                "active_during": ["STANDING", "DESCENDING", "ACTIVE", "RETURN"],
                 "description": "Uneven descent - stay balanced"
             }
         }
@@ -333,21 +333,21 @@ export const EXERCISE_CONFIGS = [
                 "threshold_deg": 155,
                 "clear_margin_deg": 5,
                 "direction": "below",
-                "active_during": ["PEAK"],
+                "active_during": ["ACTIVE"],
                 "description": "Not fully locked out - extend arms"
             },
             "arching_back": {
                 "deduction": 25,
                 "threshold_deg": 20,
                 "clear_margin_deg": 5,
-                "active_during": ["ACTIVE", "PEAK", "RETURN"],
+                "active_during": ["STANDING", "DESCENDING", "ACTIVE", "RETURN"],
                 "description": "Arching back - keep core tight"
             },
             "elbow_flare": {
                 "deduction": 15,
                 "threshold_deg": 45,
                 "clear_margin_deg": 5,
-                "active_during": ["ACTIVE", "PEAK"],
+                "active_during": ["STANDING", "DESCENDING", "ACTIVE", "RETURN"],
                 "description": "Elbows flaring - tuck them in"
             }
         }
@@ -404,21 +404,21 @@ export const EXERCISE_CONFIGS = [
                 "deduction": 20,
                 "threshold_cm": 4,
                 "clear_margin_cm": 2,
-                "active_during": ["ACTIVE", "PEAK"],
+                "active_during": ["STANDING", "DESCENDING", "ACTIVE", "RETURN"],
                 "description": "Hips sagging - keep body straight"
             },
             "half_rep": {
                 "deduction": 20,
                 "threshold_deg": 100,
                 "clear_margin_deg": 5,
-                "active_during": ["ACTIVE", "PEAK"],
+                "active_during": ["ACTIVE"],
                 "description": "Half rep - go lower"
             },
             "asymmetric_descent": {
                 "deduction": 10,
                 "threshold_deg": 15,
                 "clear_margin_deg": 5,
-                "active_during": ["ACTIVE", "PEAK"],
+                "active_during": ["STANDING", "DESCENDING", "ACTIVE", "RETURN"],
                 "description": "Uneven descent - keep both arms even"
             }
         }

@@ -125,14 +125,14 @@ export const EXERCISE_CONFIGS = [
                 "deduction": 25,
                 "threshold_deg": 35,
                 "clear_margin_deg": 5,
-                "active_during": ["STANDING", "DESCENDING", "ACTIVE", "RETURN"],
+                "active_during": ["DESCENDING", "ACTIVE"],
                 "description": "Elbow swinging - keep elbow tucked"
             },
             "insufficient_contraction": {
                 "deduction": 20,
                 "threshold_deg": 70,
                 "clear_margin_deg": 5,
-                "active_during": ["STANDING", "DESCENDING", "ACTIVE", "RETURN"],
+                "active_during": ["DESCENDING"],
                 "description": "Not curling all the way up - full range of motion"
             }
         }

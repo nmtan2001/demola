@@ -14,8 +14,8 @@ function App() {
   // Side-specific faults (elbow_swing_left, knee_cave_right, etc.) are generated
   // by FormScorer._checkFault using the SIDE_ARM_FAULTS / SIDE_LEG_FAULTS logic
   const POSTURE_FAULTS = ['back_rounding', 'arching_back', 'sagging_hips', 'piking_hips', 'hip_shoot', 'bar_path_deviation'];
-  const LEFT_ARM_FAULTS = ['elbow_swing_left', 'elbow_flare_left', 'insufficient_contraction_left', 'incomplete_lockout_left', 'half_rep'];
-  const RIGHT_ARM_FAULTS = ['elbow_swing_right', 'elbow_flare_right', 'insufficient_contraction_right', 'incomplete_lockout_right', 'half_rep'];
+  const LEFT_ARM_FAULTS = ['elbow_swing_left', 'elbow_flare_left', 'incomplete_lockout_left', 'insufficient_contraction', 'half_rep'];
+  const RIGHT_ARM_FAULTS = ['elbow_swing_right', 'elbow_flare_right', 'incomplete_lockout_right', 'insufficient_contraction', 'half_rep'];
   const LEFT_LEG_FAULTS = ['knee_cave_left', 'insufficient_depth', 'knee_over_toe', 'bounce_at_bottom'];
   const RIGHT_LEG_FAULTS = ['knee_cave_right', 'insufficient_depth', 'knee_over_toe', 'bounce_at_bottom'];
   // Non-side-specific faults that affect all limbs

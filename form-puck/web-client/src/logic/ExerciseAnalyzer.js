@@ -582,7 +582,7 @@ export class FormScorer {
     }
 
     // Side-specific checks for arm faults (elbow_swing, elbow_flare, insufficient_contraction, incomplete_lockout)
-    const SIDE_ARM_FAULTS = ['elbow_swing', 'elbow_flare', 'insufficient_contraction', 'incomplete_lockout'];
+    const SIDE_ARM_FAULTS = ['elbow_swing', 'elbow_flare', 'incomplete_lockout'];
     const SIDE_LEG_FAULTS = ['knee_cave'];
     const SIDES = ['left', 'right'];
 
@@ -752,7 +752,8 @@ export class FormScorer {
       // Use max of left/right so a single-side swing is caught, not diluted by averaging
       value = Math.max(metrics.shoulder_angle_left || 0, metrics.shoulder_angle_right || 0) || metrics.shoulder_angle;
     } else if (faultName === "insufficient_contraction") {
-      value = Math.max(metrics.elbow_angle_left || 0, metrics.elbow_angle_right || 0) || metrics.elbow_angle;
+      value = Math.min(metrics.elbow_angle_left != null ? metrics.elbow_angle_left : Infinity, metrics.elbow_angle_right != null ? metrics.elbow_angle_right : Infinity);
+      if (!isFinite(value)) value = metrics.elbow_angle;
     } else if (faultName === "incomplete_lockout") {
       value = Math.max(metrics.elbow_angle_left || 0, metrics.elbow_angle_right || 0) || metrics.elbow_angle;
     } else if (faultName === "sagging_hips") {

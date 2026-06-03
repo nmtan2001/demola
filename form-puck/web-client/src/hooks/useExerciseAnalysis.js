@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { ExerciseAnalyzer } from '../logic/ExerciseAnalyzer';
-import { useAudioFeedback } from './useAudioFeedback';
 import { EXERCISE_CONFIGS } from '../config/exercises';
 
 export const useExerciseAnalysis = () => {
@@ -19,22 +18,15 @@ export const useExerciseAnalysis = () => {
   const [activeExerciseIndex, setActiveExerciseIndex] = useState(0);
 
   const analyzerRef = useRef(null);
-  const { speak } = useAudioFeedback();
   const lastRepCountRef = useRef(0);
-  const announcedFaultsRef = useRef(new Set());
 
   const cycleExercise = useCallback(() => {
-    setActiveExerciseIndex(prev => {
-      const nextIndex = (prev + 1) % EXERCISE_CONFIGS.length;
-      speak(`Switched to ${EXERCISE_CONFIGS[nextIndex].name}`);
-      return nextIndex;
-    });
-  }, [speak]);
+    setActiveExerciseIndex(prev => (prev + 1) % EXERCISE_CONFIGS.length);
+  }, []);
 
   useEffect(() => {
     analyzerRef.current = new ExerciseAnalyzer(EXERCISE_CONFIGS[activeExerciseIndex]);
     lastRepCountRef.current = 0;
-    announcedFaultsRef.current.clear();
     setMetrics(prev => ({
       ...prev,
       repCount: 0,
@@ -64,21 +56,8 @@ export const useExerciseAnalysis = () => {
         if (form_eval.angles.elbow_angle != null) newAngles.elbow = Math.round(form_eval.angles.elbow_angle);
       }
 
-      // Audio feedback for reps
       if (repCount > lastRepCountRef.current) {
-        speak(repCount.toString());
         lastRepCountRef.current = repCount;
-        announcedFaultsRef.current.clear(); // reset faults for new rep
-      }
-
-      // Audio feedback for faults during the rep
-      if (form_eval && form_eval.faults && form_eval.faults.length > 0) {
-        form_eval.faults.forEach(fault => {
-          if (!announcedFaultsRef.current.has(fault.name)) {
-            speak(fault.name);
-            announcedFaultsRef.current.add(fault.name);
-          }
-        });
       }
 
       return {
@@ -90,7 +69,7 @@ export const useExerciseAnalysis = () => {
       };
     });
 
-  }, [speak]);
+  }, []);
 
   const activeExerciseName = EXERCISE_CONFIGS[activeExerciseIndex].name;
 

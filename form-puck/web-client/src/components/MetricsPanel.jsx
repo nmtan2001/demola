@@ -24,7 +24,7 @@ const MetricsPanel = ({ metrics = {}, activeExerciseName = '' }) => {
             <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
               {faults.map((fault, idx) => (
                 <li key={idx} style={{ color: '#fca5a5', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '0.9rem' }}>
-                  {fault.name}
+                  {fault.name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                 </li>
               ))}
             </ul>

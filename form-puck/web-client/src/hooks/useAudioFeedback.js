@@ -1,4 +1,5 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
+import { EdgeTTS } from 'edge-tts-universal';
 
 export const useAudioFeedback = () => {
   const isSupported = typeof window !== 'undefined' && 'speechSynthesis' in window;
@@ -17,17 +18,40 @@ export const useAudioFeedback = () => {
     }
   }, [isSupported]);
 
-  const speak = useCallback((text) => {
-    if (!isSupported) return;
+  const speak = useCallback(async (text) => {
+    if (!text) return;
 
-    // Optional: could cancel if we want immediate feedback, but for reps it's better to queue
-    // window.speechSynthesis.cancel();
-    
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    
-    window.speechSynthesis.speak(utterance);
+    try {
+      // Attempt to use Edge TTS first (high quality, works natively in Edge browser)
+      // Voice options: en-US-EmmaMultilingualNeural, en-US-GuyNeural, etc.
+      const tts = new EdgeTTS(text, 'en-US-EmmaMultilingualNeural');
+      const result = await tts.synthesize();
+      
+      const audioUrl = URL.createObjectURL(result.audio);
+      const audio = new Audio(audioUrl);
+      
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+      };
+      
+      await audio.play();
+    } catch (error) {
+      console.warn("Edge TTS failed (likely due to non-Edge browser restrictions). Falling back to Web Speech API:", error);
+      
+      if (!isSupported) return;
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      
+      // Try to find a Microsoft or high-quality voice in fallback
+      const voices = window.speechSynthesis.getVoices();
+      const msVoice = voices.find(v => v.name.includes('Microsoft') || v.name.includes('Google'));
+      if (msVoice) {
+        utterance.voice = msVoice;
+      }
+      
+      window.speechSynthesis.speak(utterance);
+    }
   }, [isSupported]);
 
   return { speak, isSupported };

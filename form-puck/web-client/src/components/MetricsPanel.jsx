@@ -22,7 +22,7 @@ const MetricsPanel = ({ metrics = {}, activeExerciseName = '' }) => {
           <h4>Feedback</h4>
           <ul>
             {faults.map((fault, idx) => (
-              <li key={idx}>{fault.name}</li>
+              <li key={idx}>{fault.description || fault.name}</li>
             ))}
           </ul>
         </div>
